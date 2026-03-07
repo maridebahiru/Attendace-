@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Phone } from 'lucide-react';
 import footerImg from '../assets/ELFAZ-01 (2).png';
 
-const QRCard = forwardRef(({ studentData, logo }, ref) => {
+const QRCard = forwardRef(({ studentData, logo, churchLogo }, ref) => {
     const { name, phone, idNo } = studentData;
 
     // Ethiopian Geometric Pattern (SVG String for repeating background)
@@ -49,13 +49,18 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     backgroundRepeat: 'repeat-x'
                 }} />
 
-                {/* Logo Image */}
-                <div style={{ marginTop: '5px', marginBottom: '5px' }}>
+                {/* Logo Section */}
+                <div style={{ marginTop: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px' }}>
                     <img
                         src={logo || "/logo.png"}
                         alt="Logo"
-                        style={{ width: '85px', height: '85px', objectFit: 'contain' }}
+                        style={{ width: '65px', height: '65px', objectFit: 'contain' }}
                         onError={(e) => { e.target.src = "https://placehold.co/85x85/65081b/d3a200?text=Logo"; }}
+                    />
+                    <img
+                        src={churchLogo}
+                        alt="Church Logo"
+                        style={{ width: '65px', height: '65px', objectFit: 'contain' }}
                     />
                 </div>
 

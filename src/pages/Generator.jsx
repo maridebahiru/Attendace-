@@ -4,6 +4,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import QRCard from '../components/QRCard';
 import html2canvas from 'html2canvas';
 import logo from '../assets/logo.png';
+import churchLogo from '../assets/kana.png';
 
 const Generator = () => {
     const [formData, setFormData] = useState({ name: '', phone: '', idNo: '' });
@@ -55,7 +56,7 @@ const Generator = () => {
     if (studentData) {
         return (
             <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <QRCard ref={cardRef} studentData={studentData} logo={logo} />
+                <QRCard ref={cardRef} studentData={studentData} logo={logo} churchLogo={churchLogo} />
 
                 <div style={{ marginTop: '30px', display: 'flex', gap: '15px' }}>
                     <button
@@ -95,6 +96,10 @@ const Generator = () => {
     return (
         <div style={{ maxWidth: '500px', margin: '0 auto', padding: '60px 20px' }}>
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
+                    <img src={logo} alt="Logo" style={{ height: '80px', objectFit: 'contain' }} />
+                    <img src={churchLogo} alt="Church Logo" style={{ height: '80px', objectFit: 'contain' }} />
+                </div>
                 <h1 style={{ color: '#d3a200', fontSize: '2.5rem', marginBottom: '10px' }}>የቅድመ ጋብቻ ትምህርት</h1>
                 <p style={{ color: '#f5e6c8', opacity: 0.8 }}>Registration & ID Card Generator</p>
             </div>

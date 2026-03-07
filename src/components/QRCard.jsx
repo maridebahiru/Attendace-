@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Phone } from 'lucide-react';
+import footerImg from '../assets/ELFAZ-01 (2).png';
 
 const QRCard = forwardRef(({ studentData, logo }, ref) => {
     const { name, phone, idNo } = studentData;
@@ -65,7 +66,7 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     marginBottom: '2px',
                     fontWeight: '700',
                     textAlign: 'center'
-                }}>የኢትዮጵያዊው ጀንባ ትውልድ</h3>
+                }}>የኢትዮጵያዊው ጀንደረባ ትውልድ</h3>
 
                 {/* Single line Amharic Title - Prevent hiding behind QR */}
                 <h1 style={{
@@ -78,7 +79,7 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
                     whiteSpace: 'nowrap', // Force single line
                     width: '100%'
-                }}>የቅድመ ጋብቻ ትምህርት</h1>
+                }}>የመጀመሪያው ዙር የቅድመ ጋብቻ ትምህርት</h1>
 
                 {/* QR Code Container - Lifted more to show full box */}
                 <div style={{
@@ -99,6 +100,8 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     />
                 </div>
             </div>
+
+
 
             {/* Bottom Section (58%) */}
             <div style={{
@@ -147,14 +150,31 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     color: '#d3a200',
                     fontSize: '11px',
                     textAlign: 'center',
-                    fontWeight: '700'
+                    fontWeight: '700',
+                    backgroundImage: `url(${footerImg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'relative',
+                    minHeight: '60px', // Ensure enough space for background image
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center'
                 }}>
-                    Valid Until end of course
+                    <div style={{ zIndex: 1, textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
+                        <div>ኢጃት-ድሬ 2018 ዓ/ም</div>
+                        <div style={{ fontSize: '14px', marginTop: '2px' }}>Valid Until end of course </div>
+                    </div>
+                    {/* Add an overlay if the background image is too bright */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(101, 8, 27, 0.4)',
+                        zIndex: 0
+                    }} />
                 </div>
             </div>
-
-
         </div>
+
     );
 });
 

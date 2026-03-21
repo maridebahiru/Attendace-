@@ -1,132 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import {
-    collection, query, where, onSnapshot, doc, getDoc, setDoc,
-    serverTimestamp, deleteDoc, getDocs, writeBatch
+    collection, onSnapshot, doc, getDoc, setDoc,
+    serverTimestamp, deleteDoc, getDocs, writeBatch, query, where
 } from 'firebase/firestore';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Lock, Users, UserCheck, QrCode, LogOut, Trash2, Download, Search, AlertCircle } from 'lucide-react';
+import { LogOut, LayoutDashboard, Database, Camera, Users, Calendar, Menu, X, ChevronRight, AlertCircle, UserCheck } from 'lucide-react';
+
+import AdminLogin from '../components/admin/AdminLogin';
+import AdminOverviewTab from '../components/admin/AdminOverviewTab';
+import AdminScannerTab from '../components/admin/AdminScannerTab';
+import AdminDataTab from '../components/admin/AdminDataTab';
+import AdminDateAnalysisTab from '../components/admin/AdminDateAnalysisTab';
+import AdminUserManagementTab from '../components/admin/AdminUserManagementTab';
+import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
+import { TabButton } from '../components/admin/AdminShared';
 
 const Admin = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
         sessionStorage.getItem('isAdminAuth') === 'true'
     );
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [attempts, setAttempts] = useState(0);
-    const [isLocked, setIsLocked] = useState(false);
-    const [countdown, setCountdown] = useState(0);
-
-    // Dashboard States
-    const [students, setStudents] = useState([]);
-    const [attendance, setAttendance] = useState([]);
-    const [scannedData, setScannedData] = useState(null);
-    const [isScannerActive, setIsScannerActive] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
     const [toast, setToast] = useState(null);
 
-    const HARDCODED_PASS = "maramawitdereje93@gmail.com";
-
-    // Auth Effect
-    useEffect(() => {
-        let timer;
-        if (countdown > 0) {
-            timer = setInterval(() => setCountdown(c => c - 1), 1000);
-        } else {
-            setIsLocked(false);
-        }
-        return () => clearInterval(timer);
-    }, [countdown]);
-
-    const handleLogin = (e) => {
-        e.preventDefault();
-        if (isLocked) return;
-
-        if (password === HARDCODED_PASS) {
-            setIsAuthenticated(true);
-            sessionStorage.setItem('isAdminAuth', 'true');
-        } else {
-            const newAttempts = attempts + 1;
-            setAttempts(newAttempts);
-            setError('Incorrect password. Try again.');
-
-            const card = document.getElementById('lock-card');
-            card?.classList.add('shake');
-            setTimeout(() => card?.classList.remove('shake'), 500);
-
-            if (newAttempts >= 3) {
-                setIsLocked(true);
-                setCountdown(30);
-                setError('Too many attempts. Locked for 30s.');
-            }
-        }
-    };
+    const handleLoginSuccess = () => setIsAuthenticated(true);
 
     const handleLogout = () => {
         sessionStorage.removeItem('isAdminAuth');
         setIsAuthenticated(false);
     };
 
-    // Toast Helper
     const showToast = (msg, type = 'success') => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
     };
 
     if (!isAuthenticated) {
-        return (
-            <div style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: '#65081b', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                zIndex: 1000
-            }}>
-                <style>
-                    {`
-            .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-            @keyframes shake {
-              10%, 90% { transform: translate3d(-1px, 0, 0); }
-              20%, 80% { transform: translate3d(2px, 0, 0); }
-              30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-              40%, 60% { transform: translate3d(4px, 0, 0); }
-            }
-          `}
-                </style>
-                <div id="lock-card" style={{
-                    backgroundColor: '#2a0f18', padding: '40px', borderRadius: '16px',
-                    width: '100%', maxWidth: '400px', textAlign: 'center',
-                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)', border: '1px solid #d3a200'
-                }}>
-                    <Lock size={60} color="#d3a200" style={{ marginBottom: '20px' }} />
-                    <h2 style={{ color: '#d3a200', marginBottom: '10px' }}>Admin Login</h2>
-                    <p style={{ color: '#f5e6c8', opacity: 0.7, marginBottom: '20px' }}>Access restricted to administrators.</p>
-
-                    <form onSubmit={handleLogin}>
-                        <input
-                            type="password"
-                            placeholder="Enter Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLocked}
-                            style={{
-                                width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #65081b',
-                                backgroundColor: '#1a0a0f', color: '#f5e6c8', marginBottom: '15px', outline: 'none'
-                            }}
-                        />
-                        <button
-                            type="submit"
-                            disabled={isLocked}
-                            style={{
-                                width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
-                                backgroundColor: '#d3a200', color: '#1a0a0f', fontWeight: '700', cursor: isLocked ? 'not-allowed' : 'pointer'
-                            }}
-                        >
-                            {isLocked ? `Locked (${countdown}s)` : 'Unlock Dashboard'}
-                        </button>
-                    </form>
-                    {error && <p style={{ color: '#ff4d4d', marginTop: '15px', fontSize: '14px' }}>{error}</p>}
-                </div>
-            </div>
-        );
+        return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
     }
 
     return (
@@ -138,30 +47,40 @@ const Admin = () => {
     );
 };
 
-// Sub-component for Dashboard Core
 const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [students, setStudents] = useState([]);
     const [attendance, setAttendance] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
     const [isScannerActive, setIsScannerActive] = useState(false);
     const [scanner, setScanner] = useState(null);
+    const [activeTab, setActiveTab] = useState('overview');
+    const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
-        // Real-time Students
         const qStudents = collection(db, "students");
         const unsubStudents = onSnapshot(qStudents, (snap) => {
             setStudents(snap.docs.map(doc => doc.data()));
         });
 
-        // Real-time Attendance
         const qAttendance = collection(db, "attendance");
         const unsubAttendance = onSnapshot(qAttendance, (snap) => {
             setAttendance(snap.docs.map(doc => doc.data()));
         });
 
+        const handleResize = () => {
+            if (window.innerWidth <= 768) {
+                setIsSidebarOpen(false);
+            } else {
+                setIsSidebarOpen(true);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
         return () => {
             unsubStudents();
             unsubAttendance();
+            window.removeEventListener('resize', handleResize);
         };
     }, []);
 
@@ -195,12 +114,11 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             const data = JSON.parse(decodedText);
             const today = new Date().toISOString().split('T')[0];
             const docId = `${data.phone}_${today}`;
-
             const docRef = doc(db, "attendance", docId);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                showToast(`Already checked in today: ${data.name}`, "warning");
+                showToast(`Already checked in: ${data.name}`, "warning");
                 return;
             }
 
@@ -218,205 +136,426 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         }
     };
 
+    const manualCheckIn = async (student, customDate = null) => {
+        const dateToMark = customDate || new Date().toISOString().split('T')[0];
+        if (!window.confirm(`Manually check in ${student.name} for ${dateToMark}?`)) return;
+        const docId = `${student.phone}_${dateToMark}`;
+        const docRef = doc(db, "attendance", docId);
+        
+        try {
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                showToast(`Already checked in: ${student.name} on ${dateToMark}`, "warning");
+                return;
+            }
+            await setDoc(docRef, {
+                studentName: student.name,
+                phone: student.phone,
+                idNo: student.idNo || 'Manual',
+                date: dateToMark,
+                scannedAt: customDate ? new Date(customDate) : serverTimestamp()
+            });
+            showToast(`✅ Manually Checked in: ${student.name} (${dateToMark})`);
+        } catch (e) {
+            showToast("Error during check in", "error");
+        }
+    };
+
     const exportCSV = () => {
-        const headers = ["Name", "Phone", "ID No", "Date", "Scanned At"];
-        const rows = attendance.map(a => [
-            a.studentName,
-            a.phone,
-            a.idNo,
-            a.date,
-            a.scannedAt?.toDate().toLocaleString() || ''
-        ]);
-
-        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-    };
-
-    const clearToday = async () => {
-        if (!window.confirm("Clear all attendance records for TODAY?")) return;
-        const today = new Date().toISOString().split('T')[0];
-        const q = query(collection(db, "attendance"), where("date", "==", today));
-        const snap = await getDocs(q);
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        showToast("Cleared today's records");
-    };
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const presentToday = attendance.filter(a => a.date === todayStr).length;
-
-    // Filtered Table Data (Aggregated by student)
-    const aggregated = students.map(s => {
-        const records = attendance.filter(a => a.phone === s.phone);
-        return {
-            ...s,
-            totalDays: records.length,
-            lastSeen: records.sort((a, b) => b.scannedAt - a.scannedAt)[0]?.scannedAt
+        const todayStr = new Date().toISOString().split('T')[0];
+        const allDates = [...new Set(attendance.map(a => a.date))].sort();
+        
+        // --- DATA PROCESSING FOR PARTNER ANALYTICS ---
+        const pairs = [];
+        const getGroupSortName = (st) => {
+            if (!st.partnerPhone) return st.name || '';
+            const partner = students.find(p => p.phone === st.partnerPhone);
+            const pName = partner ? partner.name : 'Unknown';
+            return (st.name || '').localeCompare(pName) < 0 ? (st.name || '') : pName;
         };
-    }).filter(s =>
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.phone.includes(searchTerm)
-    );
 
-    return (
-        <div style={{ padding: '0 0 40px 0' }}>
-            {/* Toast */}
-            {toast && (
-                <div style={{
-                    position: 'fixed', top: '20px', right: '20px', padding: '15px 25px',
-                    borderRadius: '8px', zIndex: 2000, color: '#1a0a0f', fontWeight: '700',
-                    backgroundColor: toast.type === 'error' ? '#ff4d4d' : toast.type === 'warning' ? '#d3a200' : '#d3a200',
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-                    animation: 'slideIn 0.3s ease-out'
-                }}>
-                    {toast.msg}
+        const studentsSource = [...students].sort((a, b) => {
+            const groupA = getGroupSortName(a);
+            const groupB = getGroupSortName(b);
+            if (groupA !== groupB) return groupA.localeCompare(groupB);
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        const handledPhones = new Set();
+
+        studentsSource.forEach(s => {
+            if (handledPhones.has(s.phone)) return;
+            if (s.partnerPhone) {
+                const partner = students.find(p => p.phone === s.partnerPhone);
+                if (partner) {
+                    pairs.push([s, partner]);
+                    handledPhones.add(s.phone);
+                    handledPhones.add(partner.phone);
+                } else {
+                    pairs.push([s, null]);
+                    handledPhones.add(s.phone);
+                }
+            } else {
+                pairs.push([s, null]);
+                handledPhones.add(s.phone);
+            }
+        });
+
+        let lines = [
+            "ATTENDANCE REPORT",
+            `Generated: ${new Date().toLocaleString()}`,
+            "",
+            "--- SECTION: PARTNER ANALYTICS ---",
+            `Partner 1 Name,Partner 1 Phone,Partner 2 Name,Partner 2 Phone,${allDates.join(",")},Total With Partner,Total Solo,Attendance %,Synergy %`
+        ];
+
+        const dailyJointCounts = {};
+        const dailySoloCounts = {};
+        allDates.forEach(d => { dailyJointCounts[d] = 0; dailySoloCounts[d] = 0; });
+
+        pairs.forEach(pair => {
+            const [p1, p2] = pair;
+            const row = [p1.name, p1.phone, p2 ? p2.name : "N/A", p2 ? p2.phone : "N/A"];
+            
+            let jointCount = 0;
+            let soloCount = 0;
+            let anyCount = 0;
+
+            allDates.forEach(date => {
+                const p1Present = attendance.some(a => a.phone === p1.phone && a.date === date);
+                const p2Present = p2 ? attendance.some(a => a.phone === p2.phone && a.date === date) : false;
+
+                if (p1Present && p2Present) {
+                    row.push("Both Attended");
+                    jointCount++;
+                    anyCount++;
+                    dailyJointCounts[date]++;
+                } else if (p1Present) {
+                    row.push(p1.name);
+                    soloCount++;
+                    anyCount++;
+                    dailySoloCounts[date]++;
+                } else if (p2Present) {
+                    row.push(p2.name);
+                    soloCount++;
+                    anyCount++;
+                    dailySoloCounts[date]++;
+                } else {
+                    row.push("Absent");
+                }
+            });
+
+            const attendancePercent = allDates.length > 0 ? Math.round((anyCount / allDates.length) * 100) : 0;
+            const synergy = anyCount > 0 && p2 ? Math.round((jointCount / anyCount) * 100) : 0;
+
+            row.push(jointCount, soloCount, `${attendancePercent}%`, `${synergy}%`);
+            lines.push(row.join(","));
+        });
+
+        const totalJointRow = ["TOTAL PAIRS ATTENDED TOGETHER", "", "", ""];
+        const totalSoloRow = ["TOTAL INDIVIDUALS ATTENDED SOLO", "", "", ""];
+        allDates.forEach(d => {
+            totalJointRow.push(dailyJointCounts[d]);
+            totalSoloRow.push(dailySoloCounts[d]);
+        });
+        lines.push(totalJointRow.join(","), totalSoloRow.join(","), "");
+
+        // --- DATA PROCESSING FOR INDIVIDUAL ANALYTICS ---
+        lines.push("--- SECTION: INDIVIDUAL ANALYTICS ---");
+        lines.push(`Name,Phone,${allDates.join(",")},Total Present Date`);
+
+        const dailyIndividualCounts = {};
+        allDates.forEach(d => dailyIndividualCounts[d] = 0);
+
+        studentsSource.forEach(s => {
+            const row = [s.name, s.phone];
+            let presentCount = 0;
+            allDates.forEach(date => {
+                const isPresent = attendance.some(a => a.phone === s.phone && a.date === date);
+                if (isPresent) {
+                    row.push("Present");
+                    presentCount++;
+                    dailyIndividualCounts[date]++;
+                } else {
+                    row.push("Absent");
+                }
+            });
+            row.push(presentCount);
+            lines.push(row.join(","));
+        });
+
+        const individualTotalsRow = ["TOTAL ATTENDANT COUNT", ""];
+        allDates.forEach(d => individualTotalsRow.push(dailyIndividualCounts[d]));
+        lines.push(individualTotalsRow.join(","));
+
+        const blob = new Blob([lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = `attendance_summary_${todayStr}.csv`;
+        link.click();
+    };
+
+
+    const handleLinkPartner = async (sPhone, pPhone) => {
+        try {
+            const batch = writeBatch(db);
+            batch.update(doc(db, "students", sPhone), { partnerPhone: pPhone });
+            batch.update(doc(db, "students", pPhone), { partnerPhone: sPhone });
+            await batch.commit();
+            showToast("Partners linked");
+        } catch (e) { showToast("Linking failed", "error"); }
+    };
+
+    const handleUnlinkPartner = async (sPhone, pPhone) => {
+        if (!window.confirm("Unlink partners?")) return;
+        try {
+            const batch = writeBatch(db);
+            batch.update(doc(db, "students", sPhone), { partnerPhone: null });
+            batch.update(doc(db, "students", pPhone), { partnerPhone: null });
+            await batch.commit();
+            showToast("Partners unlinked");
+        } catch (e) { showToast("Unlinking failed", "error"); }
+    };
+
+    const handleAddStudent = async (studentData) => {
+        try {
+            const docRef = doc(db, "students", studentData.phone);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                showToast("Student with this phone already exists", "error");
+                return false;
+            }
+            await setDoc(docRef, {
+                ...studentData,
+                createdAt: serverTimestamp()
+            });
+            showToast("Student added successfully");
+            return true;
+        } catch (e) {
+            showToast("Error adding student", "error");
+            return false;
+        }
+    };
+
+    const handleUpdateStudent = async (phone, updatedData) => {
+        try {
+            await setDoc(doc(db, "students", phone), updatedData, { merge: true });
+            showToast("Student updated successfully");
+            return true;
+        } catch (e) {
+            showToast("Error updating student", "error");
+            return false;
+        }
+    };
+
+    const handleDeleteStudent = async (phone) => {
+        if (!window.confirm("Are you sure you want to delete this student? Attendance records will remain.")) return;
+        try {
+            await deleteDoc(doc(db, "students", phone));
+            showToast("Student deleted successfully");
+            return true;
+        } catch (e) {
+            showToast("Error deleting student", "error");
+            return false;
+        }
+    };
+
+    const NavSection = ({ title, children }) => (
+        <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {(isSidebarOpen || isMobileMenuOpen) && (
+                <div style={{ padding: '0 20px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', opacity: 0.5, letterSpacing: '1.5px', marginBottom: '8px' }}>
+                    {title}
                 </div>
             )}
+            {children}
+        </div>
+    );
 
-            {/* Header */}
-            <div style={{
-                backgroundColor: '#65081b', padding: '15px 30px', display: 'flex',
-                justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
-            }}>
-                <h2 style={{ color: '#d3a200', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Users size={24} /> Attendance Dashboard
-                </h2>
-                <button
-                    onClick={onLogout}
+    const toggleSidebar = () => {
+        if (window.innerWidth <= 768) {
+            setIsMobileMenuOpen(!isMobileMenuOpen);
+        } else {
+            setIsSidebarOpen(!isSidebarOpen);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
+            {/* Sidebar Overlay for Mobile */}
+            {isMobileMenuOpen && (
+                <div 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 99, backdropFilter: 'blur(4px)' }}
+                ></div>
+            )}
+
+            {/* Sidebar */}
+            <aside 
+                className="glass-effect"
+                style={{
+                    width: isSidebarOpen ? '280px' : (isMobileMenuOpen ? '280px' : '80px'),
+                    transition: 'var(--transition-smooth)',
+                    borderRight: '1px solid var(--glass-border)',
+                    position: window.innerWidth <= 768 ? 'fixed' : 'sticky',
+                    left: window.innerWidth <= 768 && !isMobileMenuOpen ? '-280px' : '0',
+                    top: 0, height: '100vh',
+                    display: 'flex', flexDirection: 'column', 
+                    zIndex: 100, overflow: 'hidden',
+                    backgroundColor: window.innerWidth <= 768 ? 'var(--bg-secondary)' : 'transparent'
+                }}
+            >
+                <div style={{ padding: '30px 20px', display: 'flex', alignItems: 'center', gap: '15px', color: 'var(--accent-gold)' }}>
+                    <div style={{ minWidth: '40px', display: 'flex', justifyContent: 'center' }}>
+                        <Users size={32} />
+                    </div>
+                    {(isSidebarOpen || isMobileMenuOpen) && <span style={{ fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>EJAT ADMIN</span>}
+                </div>
+
+                <nav style={{ flex: 1, padding: '0 12px', display: 'flex', flexDirection: 'column' }} className="custom-scroll">
+                    <NavSection title="INTELLIGENCE">
+                        <TabButton 
+                            vertical icon={<LayoutDashboard size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Overview" : ""} 
+                            active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} 
+                        />
+                        <TabButton 
+                            vertical icon={<Calendar size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Date Analysis" : ""} 
+                            active={activeTab === 'date'} onClick={() => { setActiveTab('date'); setIsMobileMenuOpen(false); }} 
+                        />
+                    </NavSection>
+
+                    <NavSection title="CONTROL">
+                        <TabButton 
+                            vertical icon={<Camera size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Live Scanner" : ""} 
+                            active={activeTab === 'scanner'} onClick={() => { setActiveTab('scanner'); setIsMobileMenuOpen(false); }} 
+                        />
+                    </NavSection>
+
+                    <NavSection title="MANAGEMENT">
+                        <TabButton 
+                            vertical icon={<Database size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Students" : ""} 
+                            active={activeTab === 'data'} onClick={() => { setActiveTab('data'); setIsMobileMenuOpen(false); }} 
+                        />
+                        <TabButton 
+                            vertical icon={<Users size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Users" : ""} 
+                            active={activeTab === 'users'} onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
+                        />
+                    </NavSection>
+                </nav>
+
+                <div style={{ padding: '20px 12px', borderTop: '1px solid var(--glass-border)' }}>
+                    <button
+                        onClick={onLogout}
+                        style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+                            padding: '12px 20px', borderRadius: '12px', border: 'none',
+                            backgroundColor: 'rgba(101, 8, 27, 0.2)', color: '#ff4d4d',
+                            fontWeight: '600', cursor: 'pointer', transition: 'var(--transition-smooth)'
+                        }}
+                    >
+                        <LogOut size={20} /> {(isSidebarOpen || isMobileMenuOpen) && "Logout"}
+                    </button>
+                    <button 
+                        onClick={toggleSidebar}
+                        style={{
+                            marginTop: '10px', width: '100%', padding: '8px', borderRadius: '8px',
+                            border: '1px solid var(--glass-border)', color: 'var(--text-primary)',
+                            backgroundColor: 'transparent', cursor: 'pointer', opacity: 0.5
+                        }}
+                    >
+                        {(isSidebarOpen || isMobileMenuOpen) ? <X size={16} /> : <Menu size={16} />}
+                    </button>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                {/* Header / Global Actions */}
+                <header 
+                    className="glass-effect"
                     style={{
-                        backgroundColor: 'transparent', color: '#f5e6c8', border: '1px solid #d3a200',
-                        padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                        padding: window.innerWidth <= 768 ? '10px 20px' : '15px 40px', 
+                        borderBottom: '1px solid var(--glass-border)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        position: 'sticky', top: 0, zIndex: 90
                     }}
                 >
-                    <LogOut size={16} /> Logout
-                </button>
-            </div>
-
-            <div style={{ maxWidth: '1200px', margin: '30px auto', padding: '0 20px' }}>
-                {/* Stats Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-                    <StatCard icon={<Users color="#d3a200" />} label="Total Students" value={students.length} />
-                    <StatCard icon={<UserCheck color="#d3a200" />} label="Present Today" value={presentToday} />
-                    <StatCard icon={<QrCode color="#d3a200" />} label="Total Scans" value={attendance.length} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }}>
-                    {/* Left: Scanner */}
-                    <div style={{ backgroundColor: '#2a0f18', padding: '25px', borderRadius: '16px', border: '1px solid #65081b' }}>
-                        <h3 style={{ color: '#d3a200', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <QrCode size={20} /> Live Scanner
-                        </h3>
-                        <div id="reader" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#000' }}></div>
-                        <button
-                            onClick={isScannerActive ? stopScanner : startScanner}
-                            style={{
-                                width: '100%', marginTop: '20px', padding: '12px', borderRadius: '8px', border: 'none',
-                                backgroundColor: isScannerActive ? '#65081b' : '#d3a200',
-                                color: isScannerActive ? '#fff' : '#1a0a0f',
-                                fontWeight: '700', cursor: 'pointer'
-                            }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="show-mobile"
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--accent-gold)', cursor: 'pointer', padding: '5px' }}
                         >
-                            {isScannerActive ? 'Stop Scanner' : 'Start QR Scanner'}
+                            <Menu size={24} />
                         </button>
-                    </div>
-
-                    {/* Right: Table */}
-                    <div style={{ backgroundColor: '#2a0f18', padding: '25px', borderRadius: '16px', border: '1px solid #65081b' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h3 style={{ color: '#d3a200' }}>Attendance Records</h3>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <button onClick={exportCSV} style={actionBtnStyle}><Download size={16} /> Export</button>
-                                <button onClick={clearToday} style={{ ...actionBtnStyle, color: '#ff4d4d' }}><Trash2 size={16} /> Clear Today</button>
-                            </div>
-                        </div>
-
-                        {/* Search */}
-                        <div style={{ position: 'relative', marginBottom: '20px' }}>
-                            <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#65081b' }} />
-                            <input
-                                type="text"
-                                placeholder="Search by name or phone..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{
-                                    width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid #65081b',
-                                    backgroundColor: '#1a0a0f', color: '#f5e6c8', outline: 'none'
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                <thead>
-                                    <tr style={{ color: '#d3a200', borderBottom: '2px solid #65081b' }}>
-                                        <th style={thStyle}>Student</th>
-                                        <th style={thStyle}>Last Scene</th>
-                                        <th style={thStyle}>Days</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {aggregated.map((s, i) => (
-                                        <tr key={i} style={{ borderBottom: '1px solid rgba(101, 8, 27, 0.5)' }}>
-                                            <td style={tdStyle}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{
-                                                        width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#65081b',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d3a200', fontSize: '12px', fontWeight: 'bold'
-                                                    }}>
-                                                        {s.name.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: '600' }}>{s.name}</div>
-                                                        <div style={{ fontSize: '11px', opacity: 0.6 }}>{s.phone}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td style={tdStyle}>{s.lastSeen ? s.lastSeen.toDate().toLocaleDateString() : 'Never'}</td>
-                                            <td style={tdStyle}>
-                                                <span style={{ backgroundColor: '#65081b', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', color: '#d3a200' }}>
-                                                    {s.totalDays}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                            <span className="hide-mobile" style={{ opacity: 0.6 }}>Dashboard</span>
+                            <ChevronRight size={14} className="hide-mobile" />
+                            <span style={{ color: 'var(--accent-gold)', fontWeight: '600', textTransform: 'capitalize' }}>{activeTab.replace('-', ' ')}</span>
                         </div>
                     </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={exportCSV} className="header-action-btn" title="Export Data">
+                                <Database size={16} /> <span className="hide-mobile">Export</span>
+                            </button>
+                        </div>
+                        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--glass-border)' }} className="hide-mobile"></div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }} className="hide-mobile">
+                            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </div>
+                    </div>
+                </header>
+
+                <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+                    {activeTab === 'overview' && <AdminOverviewTab students={students} attendance={attendance} />}
+                    {activeTab === 'scanner' && <AdminScannerTab isScannerActive={isScannerActive} startScanner={startScanner} stopScanner={stopScanner} />}
+                    {activeTab === 'data' && (
+                        <AdminDataTab 
+                            students={students} attendance={attendance} 
+                            exportCSV={exportCSV} 
+                            handleLinkPartner={handleLinkPartner}
+                            handleUnlinkPartner={handleUnlinkPartner}
+                            setSelectedStudentForAnalytics={setSelectedStudentForAnalytics}
+                            manualCheckIn={manualCheckIn}
+                        />
+                    )}
+                    {activeTab === 'users' && (
+                        <AdminUserManagementTab 
+                            students={students} 
+                            onAdd={handleAddStudent}
+                            onUpdate={handleUpdateStudent}
+                            onDelete={handleDeleteStudent}
+                        />
+                    )}
+                    {activeTab === 'date' && <AdminDateAnalysisTab students={students} attendance={attendance} />}
                 </div>
-            </div>
+
+                <AdminAnalyticsModal 
+                    students={students} attendance={attendance} 
+                    selectedStudentForAnalytics={selectedStudentForAnalytics} 
+                    setSelectedStudentForAnalytics={setSelectedStudentForAnalytics} 
+                />
+
+                {toast && (
+                    <div 
+                        className="animate-slide-up"
+                        style={{
+                            position: 'fixed', bottom: '30px', right: '30px', padding: '16px 24px',
+                            borderRadius: '12px', zIndex: 2000, 
+                            backgroundColor: toast.type === 'error' ? '#ff4d4d' : 'var(--accent-gold)',
+                            color: 'var(--bg-primary)', fontWeight: '700',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                            display: 'flex', alignItems: 'center', gap: '10px'
+                        }}
+                    >
+                        {toast.type === 'error' ? <AlertCircle size={20} /> : <UserCheck size={20} />}
+                        {toast.msg}
+                    </div>
+                )}
+            </main>
         </div>
     );
 };
-
-const StatCard = ({ icon, label, value }) => (
-    <div style={{
-        backgroundColor: '#2a0f18', padding: '20px', borderRadius: '16px', border: '1px solid #65081b',
-        display: 'flex', alignItems: 'center', gap: '15px'
-    }}>
-        <div style={{ backgroundColor: 'rgba(211, 162, 0, 0.1)', padding: '12px', borderRadius: '12px' }}>
-            {icon}
-        </div>
-        <div>
-            <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '5px' }}>{label}</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#f5e6c8' }}>{value}</div>
-        </div>
-    </div>
-);
-
-const actionBtnStyle = {
-    backgroundColor: '#1a0a0f', color: '#d3a200', border: '1px solid #65081b',
-    padding: '6px 12px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', gap: '5px'
-};
-
-const thStyle = { padding: '12px', fontSize: '13px', fontWeight: '700' };
-const tdStyle = { padding: '12px', fontSize: '14px' };
 
 export default Admin;

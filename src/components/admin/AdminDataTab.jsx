@@ -14,6 +14,8 @@ const AdminDataTab = ({
     const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
     const [linkingStudentId, setLinkingStudentId] = useState(null);
     const [partnerSearchTerm, setPartnerSearchTerm] = useState('');
+    const [attendanceDatePicker, setAttendanceDatePicker] = useState(null); // student object
+    const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
 
     const handleSort = (key) => {
         setSortConfig(prev => ({
@@ -75,13 +77,17 @@ const AdminDataTab = ({
             return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
         }
 
-        const getGroupId = (st) => st.partnerPhone ? (st.phone < st.partnerPhone ? st.phone : st.partnerPhone) : st.phone;
-        const groupA = getGroupId(a);
-        const groupB = getGroupId(b);
+        const getGroupSortName = (st) => {
+            if (!st.partnerPhone) return st.name;
+            const pName = st.partnerName || 'Unknown';
+            return st.name.localeCompare(pName) < 0 ? st.name : pName;
+        };
+
+        const groupA = getGroupSortName(a);
+        const groupB = getGroupSortName(b);
         
         if (groupA !== groupB) {
-            const getSortName = (st) => st.partnerPhone && st.partnerPhone < st.phone ? (st.partnerName || '') : st.name;
-            const res = getSortName(a).localeCompare(getSortName(b));
+            const res = groupA.localeCompare(groupB);
             return sortConfig.direction === 'asc' ? res : -res;
         }
         const innerRes = a.name.localeCompare(b.name);
@@ -280,7 +286,7 @@ const AdminDataTab = ({
                                                 <button onClick={() => setSelectedStudentForAnalytics(s)} className="action-circle-btn" style={{ padding: '8px', borderRadius: '10px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--accent-gold)', cursor: 'pointer', transition: '0.2s' }} title="Deep Analytics">
                                                     <BarChart2 size={16} />
                                                 </button>
-                                                <button onClick={() => manualCheckIn(s)} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid var(--accent-gold)', backgroundColor: 'transparent', color: 'var(--accent-gold)', cursor: 'pointer', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', transition: '0.2s' }} onMouseEnter={(e)=>e.currentTarget.style.backgroundColor='var(--accent-gold)'} onMouseMouseEnter={(e)=>{e.currentTarget.style.backgroundColor='var(--accent-gold)'; e.currentTarget.style.color='var(--bg-primary)';}} onMouseLeave={(e)=>{e.currentTarget.style.backgroundColor='transparent'; e.currentTarget.style.color='var(--accent-gold)';}}>
+                                                <button onClick={() => setAttendanceDatePicker(s)} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid var(--accent-gold)', backgroundColor: 'transparent', color: 'var(--accent-gold)', cursor: 'pointer', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', transition: '0.2s' }} onMouseEnter={(e)=>e.currentTarget.style.backgroundColor='var(--accent-gold)'} onMouseMouseEnter={(e)=>{e.currentTarget.style.backgroundColor='var(--accent-gold)'; e.currentTarget.style.color='var(--bg-primary)';}} onMouseLeave={(e)=>{e.currentTarget.style.backgroundColor='transparent'; e.currentTarget.style.color='var(--accent-gold)';}}>
                                                     <UserCheck size={14} /> Mark Present
                                                 </button>
                                             </div>
@@ -301,6 +307,46 @@ const AdminDataTab = ({
                     )}
                 </div>
             </div>
+
+            {/* Manual Attendance Date Picker Modal */}
+            {attendanceDatePicker && (
+                <div 
+                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+                    onClick={() => setAttendanceDatePicker(null)}
+                >
+                    <div 
+                        className="glass-effect animate-slide-up"
+                        style={{ width: '100%', maxWidth: '400px', padding: '30px', borderRadius: '20px', border: '1px solid var(--glass-border)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ color: 'var(--accent-gold)', margin: 0, fontSize: '18px' }}>Select Attendance Date</h3>
+                            <button onClick={() => setAttendanceDatePicker(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={20}/></button>
+                        </div>
+                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Marking presence for <strong style={{ color: 'var(--text-primary)' }}>{attendanceDatePicker.name}</strong></p>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '25px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-gold)', textTransform: 'uppercase' }}>Attendance Date</label>
+                            <input 
+                                type="date"
+                                value={manualDate}
+                                onChange={(e) => setManualDate(e.target.value)}
+                                style={{ width: '100%', padding: '12px', borderRadius: '10px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
+                            />
+                        </div>
+
+                        <button 
+                            onClick={() => {
+                                manualCheckIn(attendanceDatePicker, manualDate);
+                                setAttendanceDatePicker(null);
+                            }}
+                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', backgroundColor: 'var(--accent-gold)', color: 'var(--bg-primary)', fontWeight: '800', cursor: 'pointer', transition: '0.2s' }}
+                        >
+                            Confirm Attendance
+                        </button>
+                    </div>
+                </div>
+            )}
             
             <style>
                 {`

@@ -66,12 +66,17 @@ const AdminDateAnalysisTab = ({ students, attendance }) => {
         (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
         (s.phone || '').includes(searchTerm)
     ).sort((a, b) => {
-        const getGroupId = (st) => st.partnerPhone ? (st.phone < st.partnerPhone ? st.phone : st.partnerPhone) : st.phone;
-        const groupA = getGroupId(a);
-        const groupB = getGroupId(b);
+        const getGroupSortName = (st) => {
+            if (!st.partnerPhone) return st.name;
+            const pName = st.partnerName || 'Unknown';
+            return (st.name || '').localeCompare(pName) < 0 ? st.name : pName;
+        };
+
+        const groupA = getGroupSortName(a);
+        const groupB = getGroupSortName(b);
+        
         if (groupA !== groupB) {
-            const getSortName = (st) => st.partnerPhone && st.partnerPhone < st.phone ? (st.partnerName || '') : st.name;
-            return getSortName(a).localeCompare(getSortName(b));
+            return (groupA || '').localeCompare(groupB || '');
         }
         return (a.name || '').localeCompare(b.name || '');
     });

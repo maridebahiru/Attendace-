@@ -15,6 +15,8 @@ import AdminDateAnalysisTab from '../components/admin/AdminDateAnalysisTab';
 import AdminUserManagementTab from '../components/admin/AdminUserManagementTab';
 import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
 import { TabButton } from '../components/admin/AdminShared';
+import { getStudentByQrToken, getStudentByIdentifier } from '../utils/studentUtils';
+import { exportToCSV } from '../utils/exportUtils';
 
 const Admin = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
@@ -54,8 +56,20 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [scanner, setScanner] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState(null);
+    const [lastScannedResult, setLastScannedResult] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const getAdminIdentity = () => {
+        const stored = sessionStorage.getItem('adminUser');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                return parsed.name || parsed.username || 'Admin Console';
+            } catch (e) {}
+        }
+        return 'Admin Console';
+    };
 
     useEffect(() => {
         const qStudents = collection(db, "students");
@@ -111,28 +125,64 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
     const onScanSuccess = async (decodedText) => {
         try {
-            const data = JSON.parse(decodedText);
+            let targetStudent = null;
+            const textStr = String(decodedText).trim();
+
+            if (textStr.startsWith('QR_')) {
+                targetStudent = await getStudentByQrToken(textStr);
+            } else {
+                try {
+                    const data = JSON.parse(textStr);
+                    targetStudent = await getStudentByIdentifier(data.phone || data.idNo);
+                    if (!targetStudent && data.phone) {
+                        targetStudent = {
+                            name: data.name,
+                            phone: data.phone,
+                            employeeId: data.idNo || data.phone,
+                            department: 'General'
+                        };
+                    }
+                } catch (e) {
+                    targetStudent = await getStudentByQrToken(textStr);
+                }
+            }
+
+            if (!targetStudent || !targetStudent.phone) {
+                showToast("Unrecognized QR Code token", "error");
+                return;
+            }
+
             const today = new Date().toISOString().split('T')[0];
-            const docId = `${data.phone}_${today}`;
+            const docId = `${targetStudent.phone}_${today}`;
             const docRef = doc(db, "attendance", docId);
             const docSnap = await getDoc(docRef);
 
+            const adminIdentity = getAdminIdentity();
+            const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+
             if (docSnap.exists()) {
-                showToast(`Already checked in: ${data.name}`, "warning");
+                showToast(`Already checked in: ${targetStudent.name}`, "warning");
+                setLastScannedResult({ student: targetStudent, status: 'already_checked_in' });
                 return;
             }
 
             await setDoc(docRef, {
-                studentName: data.name,
-                phone: data.phone,
-                idNo: data.idNo,
+                studentName: targetStudent.name,
+                phone: targetStudent.phone,
+                employeeId: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
+                idNo: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
+                department: targetStudent.department || 'General',
                 date: today,
-                scannedAt: serverTimestamp()
+                scannedAt: serverTimestamp(),
+                scannedBy: adminIdentity,
+                deviceInfo: deviceInfoStr
             });
 
-            showToast(`✅ Checked in: ${data.name}`);
+            showToast(`✅ Checked in: ${targetStudent.name}`);
+            setLastScannedResult({ student: targetStudent, status: 'success' });
         } catch (e) {
-            showToast("Invalid QR format", "error");
+            console.error("Scan error:", e);
+            showToast("Scan processing error", "error");
         }
     };
 
@@ -141,7 +191,10 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         if (!window.confirm(`Manually check in ${student.name} for ${dateToMark}?`)) return;
         const docId = `${student.phone}_${dateToMark}`;
         const docRef = doc(db, "attendance", docId);
-        
+
+        const adminIdentity = getAdminIdentity();
+        const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+
         try {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
@@ -149,173 +202,26 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 return;
             }
             await setDoc(docRef, {
-                studentName: student.name,
-                phone: student.phone,
-                idNo: student.idNo || 'Manual',
-                date: dateToMark,
-                scannedAt: customDate ? new Date(customDate) : serverTimestamp()
+                employeeId: student.employeeId || student.idNo || student.phone,
+                idNo: student.employeeId || student.idNo || student.phone,
+                department: student.department || 'General',
+                date: today,
+                scannedAt: serverTimestamp(),
+                scannedBy: adminIdentity,
+                deviceInfo: deviceInfoStr
             });
-            showToast(`✅ Manually Checked in: ${student.name} (${dateToMark})`);
+            showToast(`✅ Manually Checked in: ${student.name}`);
         } catch (e) {
             showToast("Error during check in", "error");
         }
     };
 
     const exportCSV = () => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const allDates = [...new Set(attendance.map(a => a.date))].sort();
-        
-        // --- DATA PROCESSING FOR PARTNER ANALYTICS ---
-        const pairs = [];
-        const getGroupSortName = (st) => {
-            if (!st.partnerPhone) return st.name || '';
-            const partner = students.find(p => p.phone === st.partnerPhone);
-            const pName = partner ? partner.name : 'Unknown';
-            return (st.name || '').localeCompare(pName) < 0 ? (st.name || '') : pName;
-        };
-
-        const studentsSource = [...students].sort((a, b) => {
-            const groupA = getGroupSortName(a);
-            const groupB = getGroupSortName(b);
-            if (groupA !== groupB) return groupA.localeCompare(groupB);
-            return (a.name || '').localeCompare(b.name || '');
-        });
-
-        const handledPhones = new Set();
-
-        studentsSource.forEach(s => {
-            if (handledPhones.has(s.phone)) return;
-            if (s.partnerPhone) {
-                const partner = students.find(p => p.phone === s.partnerPhone);
-                if (partner) {
-                    pairs.push([s, partner]);
-                    handledPhones.add(s.phone);
-                    handledPhones.add(partner.phone);
-                } else {
-                    pairs.push([s, null]);
-                    handledPhones.add(s.phone);
-                }
-            } else {
-                pairs.push([s, null]);
-                handledPhones.add(s.phone);
-            }
-        });
-
-        let lines = [
-            "ATTENDANCE REPORT",
-            `Generated: ${new Date().toLocaleString()}`,
-            "",
-            "--- SECTION: PARTNER ANALYTICS ---",
-            `Partner 1 Name,Partner 1 Phone,Partner 2 Name,Partner 2 Phone,${allDates.join(",")},Total With Partner,Total Solo,Attendance %,Synergy %`
-        ];
-
-        const dailyJointCounts = {};
-        const dailySoloCounts = {};
-        allDates.forEach(d => { dailyJointCounts[d] = 0; dailySoloCounts[d] = 0; });
-
-        pairs.forEach(pair => {
-            const [p1, p2] = pair;
-            const row = [p1.name, p1.phone, p2 ? p2.name : "N/A", p2 ? p2.phone : "N/A"];
-            
-            let jointCount = 0;
-            let soloCount = 0;
-            let anyCount = 0;
-
-            allDates.forEach(date => {
-                const p1Present = attendance.some(a => a.phone === p1.phone && a.date === date);
-                const p2Present = p2 ? attendance.some(a => a.phone === p2.phone && a.date === date) : false;
-
-                if (p1Present && p2Present) {
-                    row.push("Both Attended");
-                    jointCount++;
-                    anyCount++;
-                    dailyJointCounts[date]++;
-                } else if (p1Present) {
-                    row.push(p1.name);
-                    soloCount++;
-                    anyCount++;
-                    dailySoloCounts[date]++;
-                } else if (p2Present) {
-                    row.push(p2.name);
-                    soloCount++;
-                    anyCount++;
-                    dailySoloCounts[date]++;
-                } else {
-                    row.push("Absent");
-                }
-            });
-
-            const attendancePercent = allDates.length > 0 ? Math.round((anyCount / allDates.length) * 100) : 0;
-            const synergy = anyCount > 0 && p2 ? Math.round((jointCount / anyCount) * 100) : 0;
-
-            row.push(jointCount, soloCount, `${attendancePercent}%`, `${synergy}%`);
-            lines.push(row.join(","));
-        });
-
-        const totalJointRow = ["TOTAL PAIRS ATTENDED TOGETHER", "", "", ""];
-        const totalSoloRow = ["TOTAL INDIVIDUALS ATTENDED SOLO", "", "", ""];
-        allDates.forEach(d => {
-            totalJointRow.push(dailyJointCounts[d]);
-            totalSoloRow.push(dailySoloCounts[d]);
-        });
-        lines.push(totalJointRow.join(","), totalSoloRow.join(","), "");
-
-        // --- DATA PROCESSING FOR INDIVIDUAL ANALYTICS ---
-        lines.push("--- SECTION: INDIVIDUAL ANALYTICS ---");
-        lines.push(`Name,Phone,${allDates.join(",")},Total Present Date`);
-
-        const dailyIndividualCounts = {};
-        allDates.forEach(d => dailyIndividualCounts[d] = 0);
-
-        studentsSource.forEach(s => {
-            const row = [s.name, s.phone];
-            let presentCount = 0;
-            allDates.forEach(date => {
-                const isPresent = attendance.some(a => a.phone === s.phone && a.date === date);
-                if (isPresent) {
-                    row.push("Present");
-                    presentCount++;
-                    dailyIndividualCounts[date]++;
-                } else {
-                    row.push("Absent");
-                }
-            });
-            row.push(presentCount);
-            lines.push(row.join(","));
-        });
-
-        const individualTotalsRow = ["TOTAL ATTENDANT COUNT", ""];
-        allDates.forEach(d => individualTotalsRow.push(dailyIndividualCounts[d]));
-        lines.push(individualTotalsRow.join(","));
-
-        const blob = new Blob([lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.download = `attendance_summary_${todayStr}.csv`;
-        link.click();
+        exportToCSV({ students, attendance });
     };
 
 
-    const handleLinkPartner = async (sPhone, pPhone) => {
-        try {
-            const batch = writeBatch(db);
-            batch.update(doc(db, "students", sPhone), { partnerPhone: pPhone });
-            batch.update(doc(db, "students", pPhone), { partnerPhone: sPhone });
-            await batch.commit();
-            showToast("Partners linked");
-        } catch (e) { showToast("Linking failed", "error"); }
-    };
 
-    const handleUnlinkPartner = async (sPhone, pPhone) => {
-        if (!window.confirm("Unlink partners?")) return;
-        try {
-            const batch = writeBatch(db);
-            batch.update(doc(db, "students", sPhone), { partnerPhone: null });
-            batch.update(doc(db, "students", pPhone), { partnerPhone: null });
-            await batch.commit();
-            showToast("Partners unlinked");
-        } catch (e) { showToast("Unlinking failed", "error"); }
-    };
 
     const handleAddStudent = async (studentData) => {
         try {
@@ -509,13 +415,10 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
                 <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
                     {activeTab === 'overview' && <AdminOverviewTab students={students} attendance={attendance} />}
-                    {activeTab === 'scanner' && <AdminScannerTab isScannerActive={isScannerActive} startScanner={startScanner} stopScanner={stopScanner} />}
+                    {activeTab === 'scanner' && <AdminScannerTab isScannerActive={isScannerActive} startScanner={startScanner} stopScanner={stopScanner} lastScannedResult={lastScannedResult} />}
                     {activeTab === 'data' && (
                         <AdminDataTab 
                             students={students} attendance={attendance} 
-                            exportCSV={exportCSV} 
-                            handleLinkPartner={handleLinkPartner}
-                            handleUnlinkPartner={handleUnlinkPartner}
                             setSelectedStudentForAnalytics={setSelectedStudentForAnalytics}
                             manualCheckIn={manualCheckIn}
                         />

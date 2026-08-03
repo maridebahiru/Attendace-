@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
-import { Search, Download, UserCheck, BarChart2, Hash, Phone, Clock, Calendar as CalendarIcon, UserPlus, UserMinus, ChevronDown, X } from 'lucide-react';
+import { Search, Download, UserCheck, BarChart2, Hash, Phone, Clock, Calendar as CalendarIcon, UserPlus, ChevronDown, X, FileSpreadsheet, FileText, Filter } from 'lucide-react';
+import { exportToCSV, exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 const AdminDataTab = ({ 
     students, 
     attendance, 
-    exportCSV, 
-    handleLinkPartner, 
-    handleUnlinkPartner, 
     setSelectedStudentForAnalytics, 
     manualCheckIn 
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
-    const [linkingStudentId, setLinkingStudentId] = useState(null);
-    const [partnerSearchTerm, setPartnerSearchTerm] = useState('');
-    const [attendanceDatePicker, setAttendanceDatePicker] = useState(null); // student object
-    const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // Filter states
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [selectedDepartment, setSelectedDepartment] = useState('All');
+
+    // Get unique departments list
+    const departmentsList = ['All', ...new Set(students.map(s => s.department || 'General').filter(Boolean))];
 
     const handleSort = (key) => {
         setSortConfig(prev => ({
@@ -25,83 +27,136 @@ const AdminDataTab = ({
     };
 
     const actionBtnStyle = {
-        padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--glass-border)',
-        backgroundColor: 'rgba(211, 162, 0, 0.05)', color: 'var(--text-primary)', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600',
+        padding: '8px 14px', borderRadius: '10px', border: '1px solid var(--glass-border)',
+        backgroundColor: 'rgba(211, 162, 0, 0.08)', color: 'var(--text-primary)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700',
         transition: 'var(--transition-smooth)'
     };
 
     const thStyle = { 
-        padding: '18px 15px', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', 
+        padding: '16px 14px', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', 
         letterSpacing: '1px', color: 'var(--accent-gold)', borderBottom: '2px solid var(--accent-red)',
         position: 'sticky', top: 0, backgroundColor: 'var(--bg-tertiary)', zIndex: 10
     };
-    const tdStyle = { padding: '15px', borderBottom: '1px solid rgba(101, 8, 27, 0.2)', fontSize: '14px' };
+    const tdStyle = { padding: '14px', borderBottom: '1px solid rgba(101, 8, 27, 0.2)', fontSize: '13px' };
 
-    const aggregated = students.map(s => {
-        const records = attendance.filter(a => a.phone === s.phone);
-        const partnerId = s.partnerPhone;
-        let soloDays = 0;
-        
-        records.forEach(r => {
-            if (partnerId) {
-                const partnerAttended = attendance.some(record => record.phone === partnerId && record.date === r.date);
-                if (!partnerAttended) soloDays++;
-            } else {
-                soloDays++;
-            }
-        });
+    // Filter & Aggregate data
+    const filteredStudentsList = students.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.phone.includes(searchTerm) ||
+            (s.employeeId && s.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (s.idNo && s.idNo.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        const partnerName = partnerId ? students.find(st => st.phone === partnerId)?.name || 'Unknown' : null;
+        const dept = s.department || 'General';
+        const matchesDept = selectedDepartment === 'All' || dept === selectedDepartment;
+
+        return matchesSearch && matchesDept;
+    });
+
+    const aggregated = filteredStudentsList.map(s => {
+        let records = attendance.filter(a => a.phone === s.phone || a.employeeId === s.employeeId);
+        if (startDate) records = records.filter(a => a.date >= startDate);
+        if (endDate) records = records.filter(a => a.date <= endDate);
 
         return {
             ...s,
             totalDays: records.length,
-            soloDays,
-            partnerName,
-            lastSeen: records.sort((a, b) => b.scannedAt - a.scannedAt)[0]?.scannedAt
+            lastSeen: records.sort((a, b) => (b.scannedAt?.seconds || 0) - (a.scannedAt?.seconds || 0))[0]?.scannedAt
         };
-    }).filter(s =>
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.phone.includes(searchTerm)
-    ).sort((a, b) => {
+    }).sort((a, b) => {
         if (sortConfig.key === 'totalDays') {
             return sortConfig.direction === 'asc' ? a.totalDays - b.totalDays : b.totalDays - a.totalDays;
-        }
-        if (sortConfig.key === 'soloDays') {
-            return sortConfig.direction === 'asc' ? a.soloDays - b.soloDays : b.soloDays - a.soloDays;
-        }
-        if (sortConfig.key === 'lastSeen') {
-            const aTime = a.lastSeen?.toMillis() || 0;
-            const bTime = b.lastSeen?.toMillis() || 0;
-            return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
-        }
-
-        const getGroupSortName = (st) => {
-            if (!st.partnerPhone) return st.name;
-            const pName = st.partnerName || 'Unknown';
-            return st.name.localeCompare(pName) < 0 ? st.name : pName;
-        };
-
-        const groupA = getGroupSortName(a);
-        const groupB = getGroupSortName(b);
-        
-        if (groupA !== groupB) {
-            const res = groupA.localeCompare(groupB);
-            return sortConfig.direction === 'asc' ? res : -res;
         }
         const innerRes = a.name.localeCompare(b.name);
         return sortConfig.direction === 'asc' ? innerRes : -innerRes;
     });
+
+    const handleExportCSV = () => exportToCSV({ students, attendance, startDate, endDate, department: selectedDepartment });
+    const handleExportExcel = () => exportToExcel({ students, attendance, startDate, endDate, department: selectedDepartment });
+    const handleExportPDF = () => exportToPDF({ students, attendance, startDate, endDate, department: selectedDepartment });
 
     return (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: window.innerWidth <= 768 ? '16px' : '24px' }}>
             {/* Header / Actions Section */}
             <div className="glass-effect" style={{ padding: window.innerWidth <= 768 ? '16px' : '24px', borderRadius: 'var(--radius-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
                 <div>
-                    <h3 style={{ color: 'var(--accent-gold)', fontSize: window.innerWidth <= 768 ? '18px' : '20px', margin: 0 }}>Student Directory</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>Browse and manage student profiles and partner relationships.</p>
+                    <h3 style={{ color: 'var(--accent-gold)', fontSize: window.innerWidth <= 768 ? '18px' : '20px', margin: 0 }}>Student Directory & Export Center</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>Browse {students.length} registered students and export detailed attendance reports.</p>
                 </div>
+
+                {/* Multi-Format Export Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <button onClick={handleExportCSV} style={actionBtnStyle}>
+                        <Download size={15} /> CSV
+                    </button>
+                    <button onClick={handleExportExcel} style={{ ...actionBtnStyle, backgroundColor: 'rgba(0, 255, 128, 0.1)', color: '#00ff80', border: '1px solid rgba(0, 255, 128, 0.3)' }}>
+                        <FileSpreadsheet size={15} /> Excel
+                    </button>
+                    <button onClick={handleExportPDF} style={{ ...actionBtnStyle, backgroundColor: 'rgba(255, 77, 77, 0.1)', color: '#ff4d4d', border: '1px solid rgba(255, 77, 77, 0.3)' }}>
+                        <FileText size={15} /> PDF
+                    </button>
+                </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="glass-effect" style={{ padding: '16px 20px', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '16px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-gold)', fontWeight: '700' }}>
+                    <Filter size={16} /> Filters:
+                </div>
+
+                {/* Department Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Department:</span>
+                    <select
+                        value={selectedDepartment}
+                        onChange={(e) => setSelectedDepartment(e.target.value)}
+                        style={{
+                            padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)',
+                            backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none'
+                        }}
+                    >
+                        {departmentsList.map(dept => (
+                            <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Date Range Start */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>From:</span>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        style={{
+                            padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--glass-border)',
+                            backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none'
+                        }}
+                    />
+                </div>
+
+                {/* Date Range End */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>To:</span>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        style={{
+                            padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--glass-border)',
+                            backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none'
+                        }}
+                    />
+                </div>
+
+                {(startDate || endDate || selectedDepartment !== 'All') && (
+                    <button
+                        onClick={() => { setStartDate(''); setEndDate(''); setSelectedDepartment('All'); }}
+                        style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
+                    >
+                        Clear Filters
+                    </button>
+                )}
             </div>
 
             {/* Main Table Content */}
@@ -111,7 +166,7 @@ const AdminDataTab = ({
                         <Search size={20} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-gold)', opacity: 0.5 }} />
                         <input
                             type="text"
-                            placeholder="Find student..."
+                            placeholder="Find student by name, phone, or employee ID..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
@@ -124,245 +179,91 @@ const AdminDataTab = ({
                 </div>
 
                 <div className="mobile-scroll-x" style={{ overflowX: 'auto', maxHeight: '700px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
                         <thead>
                             <tr style={{ cursor: 'pointer' }}>
                                 <th style={thStyle} onClick={() => handleSort('name')}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        Student Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </div>
+                                    Student Profile
                                 </th>
-                                <th style={thStyle}>Linked Partner</th>
-                                <th style={{ ...thStyle }} onClick={() => handleSort('lastSeen')}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        Last Presence {sortConfig.key === 'lastSeen' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </div>
-                                </th>
+                                <th style={thStyle}>Employee / Student ID</th>
+                                <th style={thStyle}>Department & Position</th>
                                 <th style={{ ...thStyle, textAlign: 'center' }} onClick={() => handleSort('totalDays')}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        Total {sortConfig.key === 'totalDays' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </div>
-                                </th>
-                                <th style={{ ...thStyle, textAlign: 'center' }} onClick={() => handleSort('soloDays')}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        Solo {sortConfig.key === 'soloDays' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </div>
+                                    Total Attended
                                 </th>
                                 <th style={{ ...thStyle, textAlign: 'center' }}>Management</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {aggregated.map((s, i) => {
-                                const next = aggregated[i + 1];
-                                const prev = aggregated[i - 1];
-                                const isPartnerWithNext = next && (s.partnerPhone === next.phone);
-                                const isPartnerWithPrev = prev && (prev.partnerPhone === s.phone);
-                                const isStartOfGroup = isPartnerWithNext && !isPartnerWithPrev;
-                                const isEndOfGroup = isPartnerWithPrev && !isPartnerWithNext;
-                                const inGroup = isPartnerWithNext || isPartnerWithPrev;
-
-                                return (
-                                <React.Fragment key={i}>
-                                    {isStartOfGroup && i !== 0 && <tr style={{ height: '24px' }}><td colSpan="6"></td></tr>}
-                                    <tr 
-                                        style={{ 
-                                            backgroundColor: inGroup ? 'rgba(211, 162, 0, 0.04)' : 'transparent',
-                                            transition: 'var(--transition-smooth)',
-                                            borderLeft: inGroup ? '4px solid var(--accent-gold)' : '4px solid transparent'
-                                        }}
-                                        className="table-row-hover"
-                                    >
-                                        <td style={tdStyle}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                                                <div style={{
-                                                    width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'var(--accent-red)',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-gold)', 
-                                                    fontSize: '14px', fontWeight: '800', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.2)'
-                                                }}>
-                                                    {s.name.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{s.name}</div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <Phone size={10} /> {s.phone}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td style={tdStyle}>
-                                            {linkingStudentId === s.phone ? (
-                                                <div style={{ position: 'relative' }}>
-                                                    <div style={{ 
-                                                        position: 'absolute', zIndex: 100, width: '280px', top: -10, left: 0,
-                                                        backgroundColor: 'var(--bg-tertiary)', padding: '16px', borderRadius: '14px', 
-                                                        border: '1px solid var(--accent-gold)', boxShadow: 'var(--shadow-lg)',
-                                                        animation: 'slideUp 0.3s ease-out'
-                                                    }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                                            <span style={{ fontSize: '13px', color: 'var(--accent-gold)', fontWeight: '700' }}>Select Partner</span>
-                                                            <button onClick={() => { setLinkingStudentId(null); setPartnerSearchTerm(''); }} style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', fontSize: '18px' }}><X size={16} /></button>
-                                                        </div>
-                                                        <input
-                                                            type="text" autoFocus placeholder="Find student..."
-                                                            value={partnerSearchTerm}
-                                                            onChange={(e) => setPartnerSearchTerm(e.target.value)}
-                                                            style={{ 
-                                                                width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)',
-                                                                backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', marginBottom: '10px', outline: 'none'
-                                                            }}
-                                                        />
-                                                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }} className="custom-scroll">
-                                                            {students
-                                                                .filter(st => st.phone !== s.phone && !st.partnerPhone)
-                                                                .filter(st => st.name.toLowerCase().includes(partnerSearchTerm.toLowerCase()) || st.phone.includes(partnerSearchTerm))
-                                                                .map(st => (
-                                                                    <button
-                                                                        key={st.phone}
-                                                                        onClick={() => { handleLinkPartner(s.phone, st.phone); setLinkingStudentId(null); }}
-                                                                        style={{ 
-                                                                            textAlign: 'left', padding: '10px', backgroundColor: 'rgba(255,255,255,0.03)', 
-                                                                            color: 'var(--text-primary)', border: 'none', cursor: 'pointer', borderRadius: '8px', 
-                                                                            transition: 'var(--transition-smooth)' 
-                                                                        }}
-                                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(211, 162, 0, 0.15)'}
-                                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
-                                                                    >
-                                                                        <div style={{ fontSize: '13px', fontWeight: 'bold' }}>{st.name}</div>
-                                                                        <div style={{ fontSize: '10px', opacity: 0.5 }}>{st.phone}</div>
-                                                                    </button>
-                                                                ))}
-                                                            {students.filter(st => st.phone !== s.phone && !st.partnerPhone && (st.name.toLowerCase().includes(partnerSearchTerm.toLowerCase()) || st.phone.includes(partnerSearchTerm))).length === 0 && (
-                                                                <div style={{ padding: '20px', fontSize: '12px', opacity: 0.5, textAlign: 'center' }}>No available partners.</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : s.partnerName ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <span style={{ fontSize: '13px', color: 'var(--text-primary)', opacity: 0.9 }}>{s.partnerName}</span>
-                                                    <button onClick={() => handleUnlinkPartner(s.phone, s.partnerPhone)} style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', opacity: 0.5, transition: '0.2s' }} onMouseEnter={(e)=>e.currentTarget.style.opacity=1} onMouseLeave={(e)=>e.currentTarget.style.opacity=0.5}>
-                                                        <UserMinus size={14} />
-                                                    </button>
-                                                </div>
+                            {aggregated.map((s, i) => (
+                                <tr key={s.employeeId || s.phone || i} style={{ borderBottom: '1px solid rgba(101, 8, 27, 0.2)' }} className="table-row-hover">
+                                    <td style={tdStyle}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                            {s.profilePhotoUrl ? (
+                                                <img
+                                                    src={s.profilePhotoUrl}
+                                                    alt={s.name}
+                                                    style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-gold)' }}
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                />
                                             ) : (
-                                                <button 
-                                                    onClick={() => setLinkingStudentId(s.phone)} 
-                                                    style={{ 
-                                                        backgroundColor: 'transparent', color: 'var(--accent-gold)', border: '1px solid rgba(211, 162, 0, 0.3)', 
-                                                        padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '700',
-                                                        transition: 'var(--transition-smooth)'
-                                                    }}
-                                                    onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = 'rgba(211, 162, 0, 0.1)'; e.currentTarget.style.borderColor = 'var(--accent-gold)';}}
-                                                    onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'rgba(211, 162, 0, 0.3)';}}
-                                                >
-                                                    <UserPlus size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Link Partner
-                                                </button>
+                                                <div style={{
+                                                    width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'var(--accent-red)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-gold)',
+                                                    fontSize: '15px', fontWeight: '800'
+                                                }}>
+                                                    {s.name ? s.name.charAt(0) : '?'}
+                                                </div>
                                             )}
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Clock size={13} style={{ color: 'var(--accent-gold)', opacity: 0.6 }} />
-                                                <span style={{ opacity: s.lastSeen ? 1 : 0.4 }}>{s.lastSeen ? s.lastSeen.toDate().toLocaleDateString('en-GB') : 'Never'}</span>
+                                            <div>
+                                                <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{s.name}</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Phone size={10} /> {s.phone}
+                                                </div>
                                             </div>
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent-gold)', fontWeight: '800' }}>
-                                                <CalendarIcon size={14} opacity={0.5} />
-                                                {s.totalDays}
-                                            </div>
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <div style={{ 
-                                                display: 'inline-flex', padding: '4px 10px', borderRadius: '20px', 
-                                                backgroundColor: s.soloDays > 0 ? 'rgba(255, 77, 77, 0.1)' : 'transparent',
-                                                color: s.soloDays > 0 ? '#ff4d4d' : 'var(--text-secondary)',
-                                                fontSize: '12px', fontWeight: '800', border: s.soloDays > 0 ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid transparent'
-                                            }}>
-                                                {s.soloDays}
-                                            </div>
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                <button onClick={() => setSelectedStudentForAnalytics(s)} className="action-circle-btn" style={{ padding: '8px', borderRadius: '10px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--accent-gold)', cursor: 'pointer', transition: '0.2s' }} title="Deep Analytics">
-                                                    <BarChart2 size={16} />
-                                                </button>
-                                                <button onClick={() => setAttendanceDatePicker(s)} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid var(--accent-gold)', backgroundColor: 'transparent', color: 'var(--accent-gold)', cursor: 'pointer', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', transition: '0.2s' }} onMouseEnter={(e)=>e.currentTarget.style.backgroundColor='var(--accent-gold)'} onMouseMouseEnter={(e)=>{e.currentTarget.style.backgroundColor='var(--accent-gold)'; e.currentTarget.style.color='var(--bg-primary)';}} onMouseLeave={(e)=>{e.currentTarget.style.backgroundColor='transparent'; e.currentTarget.style.color='var(--accent-gold)';}}>
-                                                    <UserCheck size={14} /> Mark Present
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {isEndOfGroup && i !== aggregated.length - 1 && <tr style={{ height: '24px' }}><td colSpan="6"></td></tr>}
-                                </React.Fragment>
-                                );
-                            })}
+                                        </div>
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <span style={{ color: 'var(--accent-gold)', fontWeight: '700', backgroundColor: 'rgba(211, 162, 0, 0.1)', padding: '3px 8px', borderRadius: '6px', fontSize: '12px' }}>
+                                            {s.employeeId || s.idNo || 'N/A'}
+                                        </span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{s.department || 'General'}</div>
+                                        {s.position && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{s.position}</div>}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '800', color: 'var(--accent-gold)' }}>
+                                        {s.totalDays} Days
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                            <button
+                                                onClick={() => manualCheckIn(s)}
+                                                style={{
+                                                    padding: '6px 12px', borderRadius: '6px', border: 'none',
+                                                    backgroundColor: 'var(--accent-gold)', color: '#1a0a0f',
+                                                    fontWeight: '700', fontSize: '12px', cursor: 'pointer'
+                                                }}
+                                            >
+                                                Check In
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedStudentForAnalytics(s)}
+                                                style={{
+                                                    padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--glass-border)',
+                                                    backgroundColor: 'transparent', color: 'var(--text-primary)',
+                                                    fontWeight: '600', fontSize: '12px', cursor: 'pointer'
+                                                }}
+                                            >
+                                                Analytics
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
-                    {aggregated.length === 0 && (
-                        <div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            <Search size={48} style={{ opacity: 0.1, marginBottom: '15px' }} />
-                            <p style={{ fontSize: '16px', fontWeight: '500' }}>No matching students found.</p>
-                            <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', color: 'var(--accent-gold)', textDecoration: 'underline', marginTop: '8px', cursor: 'pointer' }}>Clear search filters</button>
-                        </div>
-                    )}
                 </div>
             </div>
-
-            {/* Manual Attendance Date Picker Modal */}
-            {attendanceDatePicker && (
-                <div 
-                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-                    onClick={() => setAttendanceDatePicker(null)}
-                >
-                    <div 
-                        className="glass-effect animate-slide-up"
-                        style={{ width: '100%', maxWidth: '400px', padding: '30px', borderRadius: '20px', border: '1px solid var(--glass-border)' }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h3 style={{ color: 'var(--accent-gold)', margin: 0, fontSize: '18px' }}>Select Attendance Date</h3>
-                            <button onClick={() => setAttendanceDatePicker(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={20}/></button>
-                        </div>
-                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Marking presence for <strong style={{ color: 'var(--text-primary)' }}>{attendanceDatePicker.name}</strong></p>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '25px' }}>
-                            <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-gold)', textTransform: 'uppercase' }}>Attendance Date</label>
-                            <input 
-                                type="date"
-                                value={manualDate}
-                                onChange={(e) => setManualDate(e.target.value)}
-                                style={{ width: '100%', padding: '12px', borderRadius: '10px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
-                            />
-                        </div>
-
-                        <button 
-                            onClick={() => {
-                                manualCheckIn(attendanceDatePicker, manualDate);
-                                setAttendanceDatePicker(null);
-                            }}
-                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', backgroundColor: 'var(--accent-gold)', color: 'var(--bg-primary)', fontWeight: '800', cursor: 'pointer', transition: '0.2s' }}
-                        >
-                            Confirm Attendance
-                        </button>
-                    </div>
-                </div>
-            )}
-            
-            <style>
-                {`
-                    .table-row-hover:hover {
-                        background-color: rgba(255, 255, 255, 0.03) !important;
-                    }
-                    .custom-scroll::-webkit-scrollbar {
-                        width: 4px;
-                    }
-                    .action-circle-btn:hover {
-                        background-color: var(--accent-gold) !important;
-                        color: var(--bg-primary) !important;
-                        transform: translateY(-2px);
-                    }
-                `}
-            </style>
         </div>
     );
 };

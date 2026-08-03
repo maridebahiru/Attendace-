@@ -202,9 +202,6 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 return;
             }
             await setDoc(docRef, {
-                studentName: student.name,
-                phone: student.phone,
-<<<<<<< HEAD
                 employeeId: student.employeeId || student.idNo || student.phone,
                 idNo: student.employeeId || student.idNo || student.phone,
                 department: student.department || 'General',
@@ -212,153 +209,15 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 scannedAt: serverTimestamp(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr
-=======
-                idNo: student.idNo || 'Manual',
-                date: dateToMark,
-                scannedAt: customDate ? new Date(customDate) : serverTimestamp()
->>>>>>> origin/elfaz
             });
-            showToast(`✅ Manually Checked in: ${student.name} (${dateToMark})`);
+            showToast(`✅ Manually Checked in: ${student.name}`);
         } catch (e) {
             showToast("Error during check in", "error");
         }
     };
 
     const exportCSV = () => {
-<<<<<<< HEAD
         exportToCSV({ students, attendance });
-=======
-        const todayStr = new Date().toISOString().split('T')[0];
-        const allDates = [...new Set(attendance.map(a => a.date))].sort();
-        
-        // --- DATA PROCESSING FOR PARTNER ANALYTICS ---
-        const pairs = [];
-        const getGroupSortName = (st) => {
-            if (!st.partnerPhone) return st.name || '';
-            const partner = students.find(p => p.phone === st.partnerPhone);
-            const pName = partner ? partner.name : 'Unknown';
-            return (st.name || '').localeCompare(pName) < 0 ? (st.name || '') : pName;
-        };
-
-        const studentsSource = [...students].sort((a, b) => {
-            const groupA = getGroupSortName(a);
-            const groupB = getGroupSortName(b);
-            if (groupA !== groupB) return groupA.localeCompare(groupB);
-            return (a.name || '').localeCompare(b.name || '');
-        });
-
-        const handledPhones = new Set();
-
-        studentsSource.forEach(s => {
-            if (handledPhones.has(s.phone)) return;
-            if (s.partnerPhone) {
-                const partner = students.find(p => p.phone === s.partnerPhone);
-                if (partner) {
-                    pairs.push([s, partner]);
-                    handledPhones.add(s.phone);
-                    handledPhones.add(partner.phone);
-                } else {
-                    pairs.push([s, null]);
-                    handledPhones.add(s.phone);
-                }
-            } else {
-                pairs.push([s, null]);
-                handledPhones.add(s.phone);
-            }
-        });
-
-        let lines = [
-            "ATTENDANCE REPORT",
-            `Generated: ${new Date().toLocaleString()}`,
-            "",
-            "--- SECTION: PARTNER ANALYTICS ---",
-            `Partner 1 Name,Partner 1 Phone,Partner 2 Name,Partner 2 Phone,${allDates.join(",")},Total With Partner,Total Solo,Attendance %,Synergy %`
-        ];
-
-        const dailyJointCounts = {};
-        const dailySoloCounts = {};
-        allDates.forEach(d => { dailyJointCounts[d] = 0; dailySoloCounts[d] = 0; });
-
-        pairs.forEach(pair => {
-            const [p1, p2] = pair;
-            const row = [p1.name, p1.phone, p2 ? p2.name : "N/A", p2 ? p2.phone : "N/A"];
-            
-            let jointCount = 0;
-            let soloCount = 0;
-            let anyCount = 0;
-
-            allDates.forEach(date => {
-                const p1Present = attendance.some(a => a.phone === p1.phone && a.date === date);
-                const p2Present = p2 ? attendance.some(a => a.phone === p2.phone && a.date === date) : false;
-
-                if (p1Present && p2Present) {
-                    row.push("Both Attended");
-                    jointCount++;
-                    anyCount++;
-                    dailyJointCounts[date]++;
-                } else if (p1Present) {
-                    row.push(p1.name);
-                    soloCount++;
-                    anyCount++;
-                    dailySoloCounts[date]++;
-                } else if (p2Present) {
-                    row.push(p2.name);
-                    soloCount++;
-                    anyCount++;
-                    dailySoloCounts[date]++;
-                } else {
-                    row.push("Absent");
-                }
-            });
-
-            const attendancePercent = allDates.length > 0 ? Math.round((anyCount / allDates.length) * 100) : 0;
-            const synergy = anyCount > 0 && p2 ? Math.round((jointCount / anyCount) * 100) : 0;
-
-            row.push(jointCount, soloCount, `${attendancePercent}%`, `${synergy}%`);
-            lines.push(row.join(","));
-        });
-
-        const totalJointRow = ["TOTAL PAIRS ATTENDED TOGETHER", "", "", ""];
-        const totalSoloRow = ["TOTAL INDIVIDUALS ATTENDED SOLO", "", "", ""];
-        allDates.forEach(d => {
-            totalJointRow.push(dailyJointCounts[d]);
-            totalSoloRow.push(dailySoloCounts[d]);
-        });
-        lines.push(totalJointRow.join(","), totalSoloRow.join(","), "");
-
-        // --- DATA PROCESSING FOR INDIVIDUAL ANALYTICS ---
-        lines.push("--- SECTION: INDIVIDUAL ANALYTICS ---");
-        lines.push(`Name,Phone,${allDates.join(",")},Total Present Date`);
-
-        const dailyIndividualCounts = {};
-        allDates.forEach(d => dailyIndividualCounts[d] = 0);
-
-        studentsSource.forEach(s => {
-            const row = [s.name, s.phone];
-            let presentCount = 0;
-            allDates.forEach(date => {
-                const isPresent = attendance.some(a => a.phone === s.phone && a.date === date);
-                if (isPresent) {
-                    row.push("Present");
-                    presentCount++;
-                    dailyIndividualCounts[date]++;
-                } else {
-                    row.push("Absent");
-                }
-            });
-            row.push(presentCount);
-            lines.push(row.join(","));
-        });
-
-        const individualTotalsRow = ["TOTAL ATTENDANT COUNT", ""];
-        allDates.forEach(d => individualTotalsRow.push(dailyIndividualCounts[d]));
-        lines.push(individualTotalsRow.join(","));
-
-        const blob = new Blob([lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.download = `attendance_summary_${todayStr}.csv`;
-        link.click();
     };
 
 

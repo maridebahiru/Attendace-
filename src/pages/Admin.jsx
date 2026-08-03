@@ -14,6 +14,8 @@ import AdminDataTab from '../components/admin/AdminDataTab';
 import AdminDateAnalysisTab from '../components/admin/AdminDateAnalysisTab';
 import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
 import { TabButton } from '../components/admin/AdminShared';
+import { getStudentByQrToken, getStudentByIdentifier } from '../utils/studentUtils';
+import { exportToCSV } from '../utils/exportUtils';
 
 const Admin = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
@@ -53,8 +55,20 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [scanner, setScanner] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState(null);
+    const [lastScannedResult, setLastScannedResult] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const getAdminIdentity = () => {
+        const stored = sessionStorage.getItem('adminUser');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                return parsed.name || parsed.username || 'Admin Console';
+            } catch (e) {}
+        }
+        return 'Admin Console';
+    };
 
     useEffect(() => {
         const qStudents = collection(db, "students");
@@ -110,28 +124,64 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
     const onScanSuccess = async (decodedText) => {
         try {
-            const data = JSON.parse(decodedText);
+            let targetStudent = null;
+            const textStr = String(decodedText).trim();
+
+            if (textStr.startsWith('QR_')) {
+                targetStudent = await getStudentByQrToken(textStr);
+            } else {
+                try {
+                    const data = JSON.parse(textStr);
+                    targetStudent = await getStudentByIdentifier(data.phone || data.idNo);
+                    if (!targetStudent && data.phone) {
+                        targetStudent = {
+                            name: data.name,
+                            phone: data.phone,
+                            employeeId: data.idNo || data.phone,
+                            department: 'General'
+                        };
+                    }
+                } catch (e) {
+                    targetStudent = await getStudentByQrToken(textStr);
+                }
+            }
+
+            if (!targetStudent || !targetStudent.phone) {
+                showToast("Unrecognized QR Code token", "error");
+                return;
+            }
+
             const today = new Date().toISOString().split('T')[0];
-            const docId = `${data.phone}_${today}`;
+            const docId = `${targetStudent.phone}_${today}`;
             const docRef = doc(db, "attendance", docId);
             const docSnap = await getDoc(docRef);
 
+            const adminIdentity = getAdminIdentity();
+            const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+
             if (docSnap.exists()) {
-                showToast(`Already checked in: ${data.name}`, "warning");
+                showToast(`Already checked in: ${targetStudent.name}`, "warning");
+                setLastScannedResult({ student: targetStudent, status: 'already_checked_in' });
                 return;
             }
 
             await setDoc(docRef, {
-                studentName: data.name,
-                phone: data.phone,
-                idNo: data.idNo,
+                studentName: targetStudent.name,
+                phone: targetStudent.phone,
+                employeeId: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
+                idNo: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
+                department: targetStudent.department || 'General',
                 date: today,
-                scannedAt: serverTimestamp()
+                scannedAt: serverTimestamp(),
+                scannedBy: adminIdentity,
+                deviceInfo: deviceInfoStr
             });
 
-            showToast(`✅ Checked in: ${data.name}`);
+            showToast(`✅ Checked in: ${targetStudent.name}`);
+            setLastScannedResult({ student: targetStudent, status: 'success' });
         } catch (e) {
-            showToast("Invalid QR format", "error");
+            console.error("Scan error:", e);
+            showToast("Scan processing error", "error");
         }
     };
 
@@ -140,7 +190,10 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         const today = new Date().toISOString().split('T')[0];
         const docId = `${student.phone}_${today}`;
         const docRef = doc(db, "attendance", docId);
-        
+
+        const adminIdentity = getAdminIdentity();
+        const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+
         try {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
@@ -150,9 +203,13 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             await setDoc(docRef, {
                 studentName: student.name,
                 phone: student.phone,
-                idNo: student.idNo || 'Manual',
+                employeeId: student.employeeId || student.idNo || student.phone,
+                idNo: student.employeeId || student.idNo || student.phone,
+                department: student.department || 'General',
                 date: today,
-                scannedAt: serverTimestamp()
+                scannedAt: serverTimestamp(),
+                scannedBy: adminIdentity,
+                deviceInfo: deviceInfoStr
             });
             showToast(`✅ Manually Checked in: ${student.name}`);
         } catch (e) {
@@ -161,57 +218,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     };
 
     const exportCSV = () => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const studentAnalysis = students.map(s => {
-            const records = attendance.filter(a => a.phone === s.phone);
-            const partnerId = s.partnerPhone;
-            let togetherCount = 0;
-            let soloCount = 0;
-            records.forEach(r => {
-                if (partnerId) {
-                    const partnerAttended = attendance.some(a => a.phone === partnerId && a.date === r.date);
-                    if (partnerAttended) togetherCount++; else soloCount++;
-                } else { soloCount++; }
-            });
-            return {
-                name: s.name, phone: s.phone, idNo: s.idNo || 'N/A',
-                totalDays: records.length, partneredDays: togetherCount,
-                soloDays: soloCount, synergy: records.length > 0 && partnerId ? Math.round((togetherCount / records.length) * 100) : 0
-            };
-        }).sort((a,b) => b.totalDays - a.totalDays);
-
-        let lines = ["ATTENDANCE ANALYSIS REPORT", `Generated: ${new Date().toLocaleString()}`, "", "--- SUMMARY ---", `Total Students,${students.length}`, `Total Scans,${attendance.length}`, "", "--- PERFORMANCE ---", "Name,Phone,ID No,Total Days,Partnered,Solo,Synergy %"];
-        studentAnalysis.forEach(s => lines.push(`${s.name},${s.phone},${s.idNo},${s.totalDays},${s.partneredDays},${s.soloDays},${s.synergy}%`));
-        lines.push("", "--- RAW LOG ---", "Name,Phone,Date,Time");
-        attendance.sort((a,b) => b.scannedAt - a.scannedAt).forEach(a => lines.push(`${a.studentName},${a.phone},${a.date},${a.scannedAt?.toDate().toLocaleTimeString() || ''}`));
-
-        const blob = new Blob([lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.download = `attendance_analysis_${todayStr}.csv`;
-        link.click();
-    };
-
-
-    const handleLinkPartner = async (sPhone, pPhone) => {
-        try {
-            const batch = writeBatch(db);
-            batch.update(doc(db, "students", sPhone), { partnerPhone: pPhone });
-            batch.update(doc(db, "students", pPhone), { partnerPhone: sPhone });
-            await batch.commit();
-            showToast("Partners linked");
-        } catch (e) { showToast("Linking failed", "error"); }
-    };
-
-    const handleUnlinkPartner = async (sPhone, pPhone) => {
-        if (!window.confirm("Unlink partners?")) return;
-        try {
-            const batch = writeBatch(db);
-            batch.update(doc(db, "students", sPhone), { partnerPhone: null });
-            batch.update(doc(db, "students", pPhone), { partnerPhone: null });
-            await batch.commit();
-            showToast("Partners unlinked");
-        } catch (e) { showToast("Unlinking failed", "error"); }
+        exportToCSV({ students, attendance });
     };
 
     const NavSection = ({ title, children }) => (
@@ -359,13 +366,10 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
                 <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
                     {activeTab === 'overview' && <AdminOverviewTab students={students} attendance={attendance} />}
-                    {activeTab === 'scanner' && <AdminScannerTab isScannerActive={isScannerActive} startScanner={startScanner} stopScanner={stopScanner} />}
+                    {activeTab === 'scanner' && <AdminScannerTab isScannerActive={isScannerActive} startScanner={startScanner} stopScanner={stopScanner} lastScannedResult={lastScannedResult} />}
                     {activeTab === 'data' && (
                         <AdminDataTab 
                             students={students} attendance={attendance} 
-                            exportCSV={exportCSV} 
-                            handleLinkPartner={handleLinkPartner}
-                            handleUnlinkPartner={handleUnlinkPartner}
                             setSelectedStudentForAnalytics={setSelectedStudentForAnalytics}
                             manualCheckIn={manualCheckIn}
                         />

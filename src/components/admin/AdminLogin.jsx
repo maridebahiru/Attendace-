@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Lock } from 'lucide-react';
+import { db } from '../../firebase/config';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { Lock, Shield, User, Key } from 'lucide-react';
 
-const HARDCODED_PASS = "maramawitdereje93@gmail.com";
+const DEFAULT_ADMIN_EMAIL = "maramawitdereje93@gmail.com";
 
 const AdminLogin = ({ onLoginSuccess }) => {
+    const [username, setUsername] = useState(DEFAULT_ADMIN_EMAIL);
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [attempts, setAttempts] = useState(0);
     const [isLocked, setIsLocked] = useState(false);
     const [countdown, setCountdown] = useState(0);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         let timer;
@@ -20,35 +24,82 @@ const AdminLogin = ({ onLoginSuccess }) => {
         return () => clearInterval(timer);
     }, [countdown]);
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         if (isLocked) return;
+        setError('');
+        setLoading(true);
 
-        if (password === HARDCODED_PASS) {
-            sessionStorage.setItem('isAdminAuth', 'true');
-            onLoginSuccess();
-        } else {
-            const newAttempts = attempts + 1;
-            setAttempts(newAttempts);
-            setError('Incorrect password. Try again.');
+        const inputUser = username.trim().toLowerCase();
+        const inputPass = password.trim();
 
-            const card = document.getElementById('lock-card');
-            card?.classList.add('shake');
-            setTimeout(() => card?.classList.remove('shake'), 500);
+        try {
+            // Query Firestore 'admins' collection
+            const adminsCol = collection(db, 'admins');
+            const q = query(adminsCol, where('username', '==', inputUser));
+            const querySnap = await getDocs(q);
 
-            if (newAttempts >= 3) {
-                setIsLocked(true);
-                setCountdown(30);
-                setError('Too many attempts. Locked for 30s.');
+            let authenticatedAdmin = null;
+
+            if (!querySnap.empty) {
+                const adminDoc = querySnap.docs[0].data();
+                // Compare provided password with admin record (hashed or matching record)
+                if (adminDoc.password === inputPass || adminDoc.passwordHash === inputPass) {
+                    authenticatedAdmin = {
+                        username: inputUser,
+                        role: adminDoc.role || 'superadmin',
+                        name: adminDoc.name || inputUser
+                    };
+                }
+            } else if (inputUser === DEFAULT_ADMIN_EMAIL.toLowerCase() && inputPass === DEFAULT_ADMIN_EMAIL) {
+                // Fallback default superadmin login
+                authenticatedAdmin = {
+                    username: DEFAULT_ADMIN_EMAIL,
+                    role: 'superadmin',
+                    name: 'Default Administrator'
+                };
             }
+
+            if (authenticatedAdmin) {
+                sessionStorage.setItem('isAdminAuth', 'true');
+                sessionStorage.setItem('adminUser', JSON.stringify(authenticatedAdmin));
+                onLoginSuccess();
+            } else {
+                const newAttempts = attempts + 1;
+                setAttempts(newAttempts);
+                setError('Invalid username or password.');
+
+                const card = document.getElementById('lock-card');
+                card?.classList.add('shake');
+                setTimeout(() => card?.classList.remove('shake'), 500);
+
+                if (newAttempts >= 5) {
+                    setIsLocked(true);
+                    setCountdown(30);
+                    setError('Too many failed attempts. Locked for 30s.');
+                }
+            }
+        } catch (err) {
+            console.error("Admin login error:", err);
+            // Fallback match check
+            if (inputUser === DEFAULT_ADMIN_EMAIL.toLowerCase() && inputPass === DEFAULT_ADMIN_EMAIL) {
+                const fallbackAdmin = { username: DEFAULT_ADMIN_EMAIL, role: 'superadmin', name: 'Super Admin' };
+                sessionStorage.setItem('isAdminAuth', 'true');
+                sessionStorage.setItem('adminUser', JSON.stringify(fallbackAdmin));
+                onLoginSuccess();
+            } else {
+                setError('Authentication service error. Please check credentials.');
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: '#65081b', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 1000
+            backgroundColor: '#1a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: '20px'
         }}>
             <style>
                 {`
@@ -62,38 +113,68 @@ const AdminLogin = ({ onLoginSuccess }) => {
       `}
             </style>
             <div id="lock-card" style={{
-                backgroundColor: '#2a0f18', padding: '40px', borderRadius: '16px',
-                width: '100%', maxWidth: '400px', textAlign: 'center',
-                boxShadow: '0 20px 50px rgba(0,0,0,0.5)', border: '1px solid #d3a200'
+                backgroundColor: '#2a0f18', padding: '40px 30px', borderRadius: '20px',
+                width: '100%', maxWidth: '420px', textAlign: 'center',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.6)', border: '1px solid rgba(211, 162, 0, 0.2)'
             }}>
-                <Lock size={60} color="#d3a200" style={{ marginBottom: '20px' }} />
-                <h2 style={{ color: '#d3a200', marginBottom: '10px' }}>Admin Login</h2>
-                <p style={{ color: '#f5e6c8', opacity: 0.7, marginBottom: '20px' }}>Access restricted to administrators.</p>
+                <div style={{
+                    width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(211,162,0,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+                    color: '#d3a200', border: '1px solid rgba(211,162,0,0.3)'
+                }}>
+                    <Shield size={32} />
+                </div>
+
+                <h2 style={{ color: '#d3a200', marginBottom: '8px', fontSize: '1.4rem', fontWeight: '800' }}>Admin Authentication</h2>
+                <p style={{ color: '#f5e6c8', opacity: 0.7, marginBottom: '24px', fontSize: '13px' }}>Restricted access for system administrators & scanners.</p>
 
                 <form onSubmit={handleLogin}>
-                    <input
-                        type="password"
-                        placeholder="Enter Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLocked}
-                        style={{
-                            width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #65081b',
-                            backgroundColor: '#1a0a0f', color: '#f5e6c8', marginBottom: '15px', outline: 'none'
-                        }}
-                    />
+                    <div style={{ textTransform: 'none', marginBottom: '16px', textAlign: 'left' }}>
+                        <label style={{ display: 'block', color: '#d3a200', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>Username / Email</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="admin@example.com"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            disabled={isLocked}
+                            style={{
+                                width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #65081b',
+                                backgroundColor: '#1a0a0f', color: '#f5e6c8', outline: 'none', boxSizing: 'border-box'
+                            }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '20px', textAlign: 'left' }}>
+                        <label style={{ display: 'block', color: '#d3a200', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>Password</label>
+                        <input
+                            type="password"
+                            required
+                            placeholder="Enter Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={isLocked}
+                            style={{
+                                width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #65081b',
+                                backgroundColor: '#1a0a0f', color: '#f5e6c8', outline: 'none', boxSizing: 'border-box'
+                            }}
+                        />
+                    </div>
+
                     <button
                         type="submit"
-                        disabled={isLocked}
+                        disabled={isLocked || loading}
                         style={{
-                            width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
-                            backgroundColor: '#d3a200', color: '#1a0a0f', fontWeight: '700', cursor: isLocked ? 'not-allowed' : 'pointer'
+                            width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
+                            backgroundColor: '#d3a200', color: '#1a0a0f', fontWeight: '800',
+                            cursor: isLocked || loading ? 'not-allowed' : 'pointer', fontSize: '15px'
                         }}
                     >
-                        {isLocked ? `Locked (${countdown}s)` : 'Unlock Dashboard'}
+                        {isLocked ? `Locked (${countdown}s)` : (loading ? 'Authenticating...' : 'Unlock Console')}
                     </button>
                 </form>
-                {error && <p style={{ color: '#ff4d4d', marginTop: '15px', fontSize: '14px' }}>{error}</p>}
+
+                {error && <p style={{ color: '#ff4d4d', marginTop: '16px', fontSize: '13px' }}>⚠️ {error}</p>}
             </div>
         </div>
     );

@@ -3,11 +3,13 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Phone } from 'lucide-react';
 import footerImg from '../assets/ELFAZ-01 (2).png';
 
-const QRCard = forwardRef(({ studentData, logo, churchLogo }, ref) => {
-    const { name, phone, idNo } = studentData;
+const QRCard = forwardRef(({ studentData, logo }, ref) => {
+    const { name, phone, idNo, employeeId, department, profilePhotoUrl, qrToken } = studentData;
 
     // Ethiopian Geometric Pattern (SVG String for repeating background)
     const borderPattern = `url("data:image/svg+xml,%3Csvg width='40' height='20' viewBox='0 0 40 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10 L10 0 L20 10 L10 20 Z M20 10 L30 0 L40 10 L30 20 Z' fill='none' stroke='%23d3a200' stroke-width='2'/%3E%3C/svg%3E")`;
+
+    const qrValue = qrToken || JSON.stringify({ name, phone, idNo: employeeId || idNo });
 
     return (
         <div
@@ -50,46 +52,41 @@ const QRCard = forwardRef(({ studentData, logo, churchLogo }, ref) => {
                 }} />
 
                 {/* Logo Section */}
-                <div style={{ marginTop: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px' }}>
+                <div style={{ marginTop: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <img
                         src={logo || "/logo.png"}
                         alt="Logo"
-                        style={{ width: '65px', height: '65px', objectFit: 'contain' }}
+                        style={{ width: '70px', height: '70px', objectFit: 'contain' }}
                         onError={(e) => { e.target.src = "https://placehold.co/85x85/65081b/d3a200?text=Logo"; }}
-                    />
-                    <img
-                        src={churchLogo}
-                        alt="Church Logo"
-                        style={{ width: '65px', height: '65px', objectFit: 'contain' }}
                     />
                 </div>
 
                 {/* Organization Name */}
                 <h3 style={{
                     color: '#d3a200',
-                    fontSize: '16px',
+                    fontSize: '14px',
                     marginBottom: '2px',
                     fontWeight: '700',
                     textAlign: 'center'
-                }}>የኢትዮጵያዊው ጀንደረባ ትውልድ</h3>
+                }}>የኢትዮጵያዊው ጃንደረባ ትውልድ ድሬዳዋ ቅርንጫፍ</h3>
 
-                {/* Single line Amharic Title - Prevent hiding behind QR */}
+                {/* Amharic Title */}
                 <h1 style={{
                     color: '#d3a200',
-                    fontSize: '20px', // Adjusted for single line
+                    fontSize: '15px',
                     textAlign: 'center',
                     fontWeight: '900',
-                    lineHeight: '1.2',
+                    lineHeight: '1.25',
                     marginTop: '2px',
                     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                    whiteSpace: 'nowrap', // Force single line
-                    width: '100%'
-                }}>የመጀመሪያው ዙር የቅድመ ጋብቻ ትምህርት</h1>
+                    width: '100%',
+                    padding: '0 10px'
+                }}>4ኛ ትውልድ ሱባዔ ጉባኤ የተማሪዎች አቴንዳንስ መቆጣጠርያ</h1>
 
-                {/* QR Code Container - Lifted more to show full box */}
+                {/* QR Code Container */}
                 <div style={{
                     position: 'absolute',
-                    bottom: '-40px', // Lifted slightly more
+                    bottom: '-40px',
                     backgroundColor: '#fff',
                     padding: '8px',
                     borderRadius: '12px',
@@ -98,41 +95,65 @@ const QRCard = forwardRef(({ studentData, logo, churchLogo }, ref) => {
                     border: '1.5px solid #d3a200'
                 }}>
                     <QRCodeSVG
-                        value={JSON.stringify({ name, phone, idNo })}
-                        size={110} // Reduced size slightly for better fit
+                        value={qrValue}
+                        size={110}
                         level="H"
-                        includeMargin={false} // Removed redundant margin to show more QR
+                        includeMargin={false}
                     />
                 </div>
             </div>
 
-
-
             {/* Bottom Section (58%) */}
             <div style={{
                 height: '58%',
-                padding: '60px 40px 10px 40px', // Reduced top padding significantly
+                padding: '50px 30px 10px 30px',
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
                 background: 'linear-gradient(45deg, #fffdf7 25%, #f9f6e5 25%, #f9f6e5 50%, #fffdf7 50%, #fffdf7 75%, #f9f6e5 75%, #f9f6e5 100%)',
                 backgroundSize: '20px 20px'
             }}>
-                {/* Subtle Diagonal Lines Watermark */}
                 <div style={{ position: 'absolute', top: 0, left: 1, right: 0, bottom: 0, opacity: 0.05, pointerEvents: 'none', backgroundImage: 'repeating-linear-gradient(45deg, #65081b, #65081b 1px, transparent 1px, transparent 10px)' }} />
 
-                {/* Info Rows - Tighter spacing to remove whitespace */}
-                <div style={{ marginBottom: '10px' }}>
-                    <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '13px', marginBottom: '1px' }}>Name</label>
-                    <div style={{ color: '#65081b', fontSize: '22px', fontWeight: '600', borderBottom: '1px solid rgba(101, 8, 27, 0.1)' }}>{name}</div>
+                {/* Profile Header Row with optional Photo */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '12px' }}>
+                    {profilePhotoUrl ? (
+                        <img
+                            src={profilePhotoUrl}
+                            alt={name}
+                            style={{
+                                width: '60px',
+                                height: '60px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                border: '2px solid #65081b'
+                            }}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                    ) : null}
+
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase' }}>Full Name</label>
+                        <div style={{ color: '#65081b', fontSize: '18px', fontWeight: '700' }}>{name}</div>
+                        {(employeeId || idNo) && (
+                            <div style={{ color: '#d3a200', backgroundColor: '#65081b', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', marginTop: '3px' }}>
+                                ID: {employeeId || idNo}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <div style={{ marginBottom: '10px' }}>
-                    <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '13px', marginBottom: '1px' }}>Phone</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Phone size={18} color="#65081b" />
-                        <div style={{ color: '#65081b', fontSize: '20px', fontWeight: '600' }}>{phone}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    <div>
+                        <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px' }}>Phone</label>
+                        <div style={{ color: '#65081b', fontSize: '14px', fontWeight: '600' }}>{phone}</div>
                     </div>
+                    {department && (
+                        <div>
+                            <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px' }}>Department</label>
+                            <div style={{ color: '#65081b', fontSize: '14px', fontWeight: '600' }}>{department}</div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Spacer - Reduced to push content up */}

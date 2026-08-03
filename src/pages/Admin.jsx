@@ -14,6 +14,7 @@ import AdminDataTab from '../components/admin/AdminDataTab';
 import AdminDateAnalysisTab from '../components/admin/AdminDateAnalysisTab';
 import AdminUserManagementTab from '../components/admin/AdminUserManagementTab';
 import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
+import AdminScannedIDModal from '../components/admin/AdminScannedIDModal';
 import { TabButton } from '../components/admin/AdminShared';
 import { getStudentByQrToken, getStudentByIdentifier } from '../utils/studentUtils';
 import { exportToCSV } from '../utils/exportUtils';
@@ -57,6 +58,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState(null);
     const [lastScannedResult, setLastScannedResult] = useState(null);
+    const [scannedModalData, setScannedModalData] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -162,7 +164,9 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
             if (docSnap.exists()) {
                 showToast(`Already checked in: ${targetStudent.name}`, "warning");
-                setLastScannedResult({ student: targetStudent, status: 'already_checked_in' });
+                const res = { student: targetStudent, status: 'already_checked_in', scannedAt: new Date() };
+                setLastScannedResult(res);
+                setScannedModalData(res);
                 return;
             }
 
@@ -179,7 +183,9 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             });
 
             showToast(`✅ Checked in: ${targetStudent.name}`);
-            setLastScannedResult({ student: targetStudent, status: 'success' });
+            const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
+            setLastScannedResult(res);
+            setScannedModalData(res);
         } catch (e) {
             console.error("Scan error:", e);
             showToast("Scan processing error", "error");
@@ -415,7 +421,15 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
                 <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
                     {activeTab === 'overview' && <AdminOverviewTab students={students} attendance={attendance} />}
-                    {activeTab === 'scanner' && <AdminScannerTab isScannerActive={isScannerActive} startScanner={startScanner} stopScanner={stopScanner} lastScannedResult={lastScannedResult} />}
+                    {activeTab === 'scanner' && (
+                        <AdminScannerTab 
+                            isScannerActive={isScannerActive} 
+                            startScanner={startScanner} 
+                            stopScanner={stopScanner} 
+                            lastScannedResult={lastScannedResult} 
+                            onOpenModal={(res) => setScannedModalData(res)} 
+                        />
+                    )}
                     {activeTab === 'data' && (
                         <AdminDataTab 
                             students={students} attendance={attendance} 
@@ -438,6 +452,11 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                     students={students} attendance={attendance} 
                     selectedStudentForAnalytics={selectedStudentForAnalytics} 
                     setSelectedStudentForAnalytics={setSelectedStudentForAnalytics} 
+                />
+
+                <AdminScannedIDModal 
+                    scanResult={scannedModalData} 
+                    onClose={() => setScannedModalData(null)} 
                 />
 
                 {toast && (

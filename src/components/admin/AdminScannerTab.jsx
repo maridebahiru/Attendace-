@@ -1,7 +1,7 @@
 import React from 'react';
 import { QrCode, Camera, Shield, AlertCircle, CameraOff, CheckCircle2, User, Building, Briefcase, Mail, Phone, IdCard } from 'lucide-react';
 
-const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult }) => (
+const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult, onOpenModal }) => (
     <div className="animate-fade-in" style={{ maxWidth: '750px', margin: '0 auto' }}>
         <div className="glass-effect" style={{ padding: window.innerWidth <= 768 ? '20px' : '36px', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
             <div style={{
@@ -64,14 +64,20 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
 
             {/* Scan Result Overlay Panel */}
             {lastScannedResult && lastScannedResult.student && (
-                <div style={{
-                    marginTop: '24px',
-                    padding: '24px',
-                    borderRadius: '16px',
-                    backgroundColor: lastScannedResult.status === 'already_checked_in' ? 'rgba(211, 162, 0, 0.1)' : 'rgba(0, 255, 128, 0.1)',
-                    border: `1px solid ${lastScannedResult.status === 'already_checked_in' ? '#d3a200' : '#00ff80'}`,
-                    textAlign: 'left'
-                }}>
+                <div 
+                    onClick={() => onOpenModal && onOpenModal(lastScannedResult)}
+                    style={{
+                        marginTop: '24px',
+                        padding: '24px',
+                        borderRadius: '16px',
+                        backgroundColor: lastScannedResult.status === 'already_checked_in' ? 'rgba(211, 162, 0, 0.1)' : 'rgba(0, 255, 128, 0.1)',
+                        border: `1px solid ${lastScannedResult.status === 'already_checked_in' ? '#d3a200' : '#00ff80'}`,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease'
+                    }}
+                    title="Click to view full Student ID Card Popup"
+                >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                         <span style={{
                             fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px',
@@ -81,7 +87,7 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
                             {lastScannedResult.status === 'already_checked_in' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
                             {lastScannedResult.status === 'already_checked_in' ? 'Already Checked In Today' : 'Check-In Successful'}
                         </span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Just Now</span>
+                        <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: '700' }}>View Full ID Card ↗</span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

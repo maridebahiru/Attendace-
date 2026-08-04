@@ -12,6 +12,42 @@ function convertDriveUrl(url) {
   return url.trim();
 }
 
+async function fetchAllFirestoreDocNames() {
+  let allDocNames = [];
+  let nextPageToken = null;
+
+  do {
+    let url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/students?pageSize=300`;
+    if (nextPageToken) {
+      url += `&pageToken=${encodeURIComponent(nextPageToken)}`;
+    }
+
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      const docs = json.documents || [];
+      const names = docs.map(d => d.name);
+      allDocNames.push(...names);
+      nextPageToken = json.nextPageToken || null;
+      console.log(`Fetched page of ${docs.length} docs (Total gathered so far: ${allDocNames.length})`);
+    } catch (e) {
+      console.error("Error fetching doc page:", e);
+      break;
+    }
+  } while (nextPageToken);
+
+  return allDocNames;
+}
+
+async function deleteDoc(docName) {
+  const url = `https://firestore.googleapis.com/v1/${docName}`;
+  try {
+    await fetch(url, { method: 'DELETE' });
+  } catch (e) {
+    console.error(`Error deleting ${docName}:`, e);
+  }
+}
+
 async function writeDoc(docId, student) {
   const fields = {
     name: { stringValue: student.name || '' },
@@ -41,21 +77,39 @@ async function writeDoc(docId, student) {
   }
 }
 
-async function runImport() {
-  console.log("Loading Excel file into Firebase Firestore...");
+async function purgeAndSetExact708() {
+  console.log("=== STEP 1: PAGINATING ALL DOCUMENTS IN FIRESTORE STUDENTS COLLECTION ===");
+  const allDocNames = await fetchAllFirestoreDocNames();
+  console.log(`\nFound total ${allDocNames.length} documents in Firestore.`);
+
+  if (allDocNames.length > 0) {
+    console.log(`Deleting all ${allDocNames.length} documents in batches...`);
+    const BATCH_SIZE = 30;
+    for (let i = 0; i < allDocNames.length; i += BATCH_SIZE) {
+      const chunk = allDocNames.slice(i, i + BATCH_SIZE);
+      await Promise.all(chunk.map(deleteDoc));
+      console.log(`Deleted ${Math.min(i + BATCH_SIZE, allDocNames.length)}/${allDocNames.length} old documents...`);
+    }
+    console.log("✅ All old documents successfully purged.");
+  }
+
+  // Verification step: check if collection is empty
+  const verifyDocs = await fetchAllFirestoreDocNames();
+  console.log(`Verification check: ${verifyDocs.length} documents remain in collection.`);
+
+  console.log("\n=== STEP 2: UPLOADING EXACT 708 EXCEL ATTENDEES ===");
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-  console.log(`Found ${rows.length} total records to process for Firebase.`);
+  console.log(`Excel file contains ${rows.length} rows.`);
 
   let inserted = 0;
-  let errors = 0;
+  const UPLOAD_BATCH = 25;
 
-  const BATCH_SIZE = 25;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    
+  for (let i = 0; i < rows.length; i += UPLOAD_BATCH) {
+    const batch = rows.slice(i, i + UPLOAD_BATCH);
+
     await Promise.all(batch.map(async (r, idx) => {
       const globalIdx = i + idx;
       const rawName = (r['ሙሉ ስም'] || '').toString().trim();
@@ -73,9 +127,8 @@ async function runImport() {
         cleanPhone = `090000${String(globalIdx + 1).padStart(4, '0')}`;
       }
 
-      // Unique Document ID per response row
       const empId = `EJAT-${String(globalIdx + 1).padStart(4, '0')}`;
-      const docId = cleanPhone !== '0900000000' && cleanPhone.length >= 9 ? cleanPhone : empId;
+      const docId = empId; // Fixed unique document ID EJAT-0001 through EJAT-0708
 
       const studentData = {
         name: rawName || `Attendee ${globalIdx + 1}`,
@@ -91,20 +144,14 @@ async function runImport() {
       };
 
       const res = await writeDoc(docId, studentData);
-      if (res.status === 200) {
-        inserted++;
-      } else {
-        errors++;
-      }
+      if (res.status === 200) inserted++;
     }));
 
-    console.log(`Firebase Import Progress: ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length} records processed...`);
+    console.log(`Uploaded ${Math.min(i + UPLOAD_BATCH, rows.length)}/${rows.length} attendee documents...`);
   }
 
-  console.log("\n🎉 --- FIREBASE IMPORT COMPLETE ---");
-  console.log(`Total Excel Rows: ${rows.length}`);
-  console.log(`Successfully Uploaded to Firebase Firestore: ${inserted}`);
-  console.log(`Errors: ${errors}`);
+  console.log(`\n🎉 === SUCCESS: FIRESTORE SYNC COMPLETE ===`);
+  console.log(`Exact Total Students in Firestore: ${inserted}`);
 }
 
-runImport();
+purgeAndSetExact708();

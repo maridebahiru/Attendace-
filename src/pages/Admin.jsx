@@ -18,6 +18,7 @@ import AdminScannedIDModal from '../components/admin/AdminScannedIDModal';
 import { TabButton } from '../components/admin/AdminShared';
 import { getStudentByQrToken, getStudentByIdentifier } from '../utils/studentUtils';
 import { exportToCSV } from '../utils/exportUtils';
+import { checkPermission, logSuperAdminAudit, getUserRole } from '../utils/rbac';
 
 const Admin = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
@@ -127,25 +128,37 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
     const onScanSuccess = async (decodedText) => {
         try {
-            let targetStudent = null;
             const textStr = String(decodedText).trim();
+            if (!textStr) return;
 
-            if (textStr.startsWith('QR_')) {
+            let targetStudent = null;
+
+            // 1. Check direct identifier lookup (Employee ID e.g. EJAT-0001, Phone number, or Doc ID)
+            targetStudent = await getStudentByIdentifier(textStr);
+
+            // 2. Check QR Token (e.g. QR_xxxx)
+            if (!targetStudent) {
                 targetStudent = await getStudentByQrToken(textStr);
-            } else {
+            }
+
+            // 3. Check JSON payload string
+            if (!targetStudent) {
                 try {
                     const data = JSON.parse(textStr);
-                    targetStudent = await getStudentByIdentifier(data.phone || data.idNo);
-                    if (!targetStudent && data.phone) {
+                    const identifier = data.phone || data.idNo || data.employeeId;
+                    if (identifier) {
+                        targetStudent = await getStudentByIdentifier(identifier);
+                    }
+                    if (!targetStudent && (data.name || data.phone)) {
                         targetStudent = {
-                            name: data.name,
-                            phone: data.phone,
-                            employeeId: data.idNo || data.phone,
+                            name: data.name || 'Attendee',
+                            phone: data.phone || data.idNo || 'N/A',
+                            employeeId: data.idNo || data.employeeId || 'N/A',
                             department: 'General'
                         };
                     }
                 } catch (e) {
-                    targetStudent = await getStudentByQrToken(textStr);
+                    // Ignore JSON parse error
                 }
             }
 
@@ -193,6 +206,12 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     };
 
     const manualCheckIn = async (student, customDate = null) => {
+        const perm = checkPermission('manual_checkin');
+        if (!perm.allowed) {
+            showToast(perm.reason, "error");
+            return;
+        }
+
         const dateToMark = customDate || new Date().toISOString().split('T')[0];
         if (!window.confirm(`Manually check in ${student.name} for ${dateToMark}?`)) return;
         const docId = `${student.phone}_${dateToMark}`;
@@ -211,7 +230,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 employeeId: student.employeeId || student.idNo || student.phone,
                 idNo: student.employeeId || student.idNo || student.phone,
                 department: student.department || 'General',
-                date: today,
+                date: dateToMark,
                 scannedAt: serverTimestamp(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr
@@ -226,10 +245,12 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         exportToCSV({ students, attendance });
     };
 
-
-
-
     const handleAddStudent = async (studentData) => {
+        const perm = checkPermission('create_user');
+        if (!perm.allowed) {
+            showToast(perm.reason, "error");
+            return false;
+        }
         try {
             const docRef = doc(db, "students", studentData.phone);
             const docSnap = await getDoc(docRef);
@@ -250,6 +271,11 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     };
 
     const handleUpdateStudent = async (phone, updatedData) => {
+        const perm = checkPermission('edit_user');
+        if (!perm.allowed) {
+            showToast(perm.reason, "error");
+            return false;
+        }
         try {
             await setDoc(doc(db, "students", phone), updatedData, { merge: true });
             showToast("Student updated successfully");
@@ -261,6 +287,11 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     };
 
     const handleDeleteStudent = async (phone) => {
+        const perm = checkPermission('delete_user');
+        if (!perm.allowed) {
+            showToast(perm.reason, "error");
+            return false;
+        }
         if (!window.confirm("Are you sure you want to delete this student? Attendance records will remain.")) return;
         try {
             await deleteDoc(doc(db, "students", phone));

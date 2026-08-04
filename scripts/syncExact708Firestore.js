@@ -12,6 +12,27 @@ function convertDriveUrl(url) {
   return url.trim();
 }
 
+async function getAllDocs() {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/students?pageSize=3000`;
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.documents || [];
+  } catch (e) {
+    console.error("Error fetching docs:", e);
+    return [];
+  }
+}
+
+async function deleteDoc(docName) {
+  const url = `https://firestore.googleapis.com/v1/${docName}`;
+  try {
+    await fetch(url, { method: 'DELETE' });
+  } catch (e) {
+    console.error(`Error deleting ${docName}:`, e);
+  }
+}
+
 async function writeDoc(docId, student) {
   const fields = {
     name: { stringValue: student.name || '' },
@@ -41,18 +62,28 @@ async function writeDoc(docId, student) {
   }
 }
 
-async function runImport() {
-  console.log("Loading Excel file into Firebase Firestore...");
+async function syncExact708() {
+  console.log("1. Fetching all current Firestore student documents...");
+  const currentDocs = await getAllDocs();
+  console.log(`Found ${currentDocs.length} existing documents in Firestore.`);
+
+  if (currentDocs.length > 0) {
+    console.log("Cleaning up old/duplicate documents from Firestore...");
+    const deletePromises = currentDocs.map(d => deleteDoc(d.name));
+    await Promise.all(deletePromises);
+    console.log("Finished deleting old documents.");
+  }
+
+  console.log("\n2. Reading Excel file...");
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-  console.log(`Found ${rows.length} total records to process for Firebase.`);
+  console.log(`Uploading exact ${rows.length} records to Firestore...`);
 
   let inserted = 0;
-  let errors = 0;
-
   const BATCH_SIZE = 25;
+
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
     
@@ -73,9 +104,9 @@ async function runImport() {
         cleanPhone = `090000${String(globalIdx + 1).padStart(4, '0')}`;
       }
 
-      // Unique Document ID per response row
       const empId = `EJAT-${String(globalIdx + 1).padStart(4, '0')}`;
-      const docId = cleanPhone !== '0900000000' && cleanPhone.length >= 9 ? cleanPhone : empId;
+      // Unique document ID per row to preserve exact count of 708
+      const docId = empId;
 
       const studentData = {
         name: rawName || `Attendee ${globalIdx + 1}`,
@@ -91,20 +122,14 @@ async function runImport() {
       };
 
       const res = await writeDoc(docId, studentData);
-      if (res.status === 200) {
-        inserted++;
-      } else {
-        errors++;
-      }
+      if (res.status === 200) inserted++;
     }));
 
-    console.log(`Firebase Import Progress: ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length} records processed...`);
+    console.log(`Synced ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length} records...`);
   }
 
-  console.log("\n🎉 --- FIREBASE IMPORT COMPLETE ---");
-  console.log(`Total Excel Rows: ${rows.length}`);
-  console.log(`Successfully Uploaded to Firebase Firestore: ${inserted}`);
-  console.log(`Errors: ${errors}`);
+  console.log(`\n🎉 --- SYNC COMPLETE ---`);
+  console.log(`Total Firestore Student Documents: ${inserted}`);
 }
 
-runImport();
+syncExact708();

@@ -128,17 +128,22 @@ const Dashboard = () => {
                                     <img
                                         src={student.profilePhotoUrl}
                                         alt={student.name}
-                                        style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #d3a200' }}
+                                        style={{ width: '85px', height: '85px', borderRadius: '16px', objectFit: 'cover', border: '3px solid #d3a200', boxShadow: '0 4px 15px rgba(0,0,0,0.4)' }}
                                         onError={(e) => { e.target.style.display = 'none'; }}
                                     />
                                 ) : (
-                                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(211,162,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d3a200', border: '3px solid #d3a200' }}>
-                                        <User size={40} />
+                                    <div style={{ width: '85px', height: '85px', borderRadius: '16px', backgroundColor: 'rgba(211,162,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d3a200', border: '3px solid #d3a200' }}>
+                                        <User size={42} />
                                     </div>
                                 )}
 
                                 <div>
                                     <h2 style={{ color: '#d3a200', margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{student.name}</h2>
+                                    {student.christianName && (
+                                        <div style={{ color: '#d3a200', fontSize: '14px', fontWeight: '700', marginTop: '2px' }}>
+                                            የክርስትና ስም: {student.christianName}
+                                        </div>
+                                    )}
                                     {(student.employeeId || student.idNo) && (
                                         <div style={{ color: '#f5e6c8', opacity: 0.8, fontSize: '13px', marginTop: '4px' }}>
                                             ID: <strong>{student.employeeId || student.idNo}</strong>
@@ -158,28 +163,59 @@ const Dashboard = () => {
 
                                 {student.department && (
                                     <div>
-                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Department</div>
+                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Church (አጥቢያ)</div>
                                         <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Building size={14} color="#d3a200" /> {student.department}
                                         </div>
                                     </div>
                                 )}
 
+                                {student.educationLevel && (
+                                    <div>
+                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Education (ትምህርት)</div>
+                                        <div style={{ fontWeight: '600' }}>{student.educationLevel}</div>
+                                    </div>
+                                )}
+
                                 {student.position && (
                                     <div>
-                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Position</div>
+                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Work (የስራ ዘርፍ)</div>
                                         <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Briefcase size={14} color="#d3a200" /> {student.position}
                                         </div>
                                     </div>
                                 )}
 
-                                {student.email && (
+                                {student.sundaySchoolMember && (
                                     <div>
-                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Email</div>
-                                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            <Mail size={14} color="#d3a200" /> {student.email}
-                                        </div>
+                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Sunday School Student</div>
+                                        <div style={{ fontWeight: '600', color: '#d3a200' }}>{student.sundaySchoolMember}</div>
+                                    </div>
+                                )}
+
+                                {student.profilePhotoUrl && (
+                                    <div style={{ gridColumn: 'span 2', marginTop: '6px' }}>
+                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px' }}>ID Photo Attachment</div>
+                                        <a
+                                            href={student.profilePhotoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '8px 14px',
+                                                borderRadius: '8px',
+                                                backgroundColor: 'rgba(211, 162, 0, 0.15)',
+                                                border: '1px solid #d3a200',
+                                                color: '#d3a200',
+                                                fontWeight: '700',
+                                                fontSize: '13px',
+                                                textDecoration: 'none'
+                                            }}
+                                        >
+                                            <IdCard size={16} /> View Uploaded ID Photo Document →
+                                        </a>
                                     </div>
                                 )}
                             </div>

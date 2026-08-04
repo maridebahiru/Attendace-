@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Search, Plus, Edit2, Trash2, X, User, Phone, Hash, Save, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, User, Phone, Hash, Save, AlertCircle, Shield, Lock, Users } from 'lucide-react';
+import { isSuperAdmin, checkPermission, getUserRole } from '../../utils/rbac';
+import AdminAccountsSection from './AdminAccountsSection';
+
 
 const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
+    const [subTab, setSubTab] = useState('students');
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
@@ -83,29 +87,92 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
         );
     };
 
+    const hasWriteAccess = isSuperAdmin();
+
+    const handleAddClick = () => {
+        const perm = checkPermission('create_user');
+        if (!perm.allowed) {
+            alert(perm.reason);
+            return;
+        }
+        setIsAddModalOpen(true);
+    };
+
     return (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Header Section */}
-            <div className="glass-effect" style={{ padding: '24px', borderRadius: 'var(--radius-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-                <div>
-                    <h3 style={{ color: 'var(--accent-gold)', fontSize: '20px', margin: 0 }}>User Management</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>Add, edit, or remove students from the system.</p>
-                </div>
-                <button 
-                    onClick={() => setIsAddModalOpen(true)}
-                    style={{ 
-                        backgroundColor: 'var(--accent-gold)', color: 'var(--bg-primary)', 
-                        padding: '12px 24px', borderRadius: '12px', border: 'none', 
-                        fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px',
-                        cursor: 'pointer', transition: 'var(--transition-smooth)',
-                        boxShadow: '0 4px 15px rgba(211, 162, 0, 0.3)'
+            {/* Sub-Tab Navigation Bar */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                    onClick={() => setSubTab('students')}
+                    style={{
+                        padding: '12px 22px', borderRadius: '12px', border: '1px solid var(--glass-border)',
+                        backgroundColor: subTab === 'students' ? 'var(--accent-gold)' : 'var(--bg-secondary)',
+                        color: subTab === 'students' ? 'var(--bg-primary)' : 'var(--text-primary)',
+                        fontWeight: '700', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                        transition: 'var(--transition-smooth)'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                 >
-                    <Plus size={20} /> Add Student
+                    <Users size={18} /> Student Accounts
+                </button>
+                <button
+                    onClick={() => setSubTab('admins')}
+                    style={{
+                        padding: '12px 22px', borderRadius: '12px', border: '1px solid var(--glass-border)',
+                        backgroundColor: subTab === 'admins' ? 'var(--accent-gold)' : 'var(--bg-secondary)',
+                        color: subTab === 'admins' ? 'var(--bg-primary)' : 'var(--text-primary)',
+                        fontWeight: '700', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                        transition: 'var(--transition-smooth)'
+                    }}
+                >
+                    <Shield size={18} /> Admin Accounts
                 </button>
             </div>
+
+            {subTab === 'admins' ? (
+                <AdminAccountsSection />
+            ) : (
+                <>
+                    {/* Header Section */}
+                    <div className="glass-effect" style={{ padding: '24px', borderRadius: 'var(--radius-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <h3 style={{ color: 'var(--accent-gold)', fontSize: '20px', margin: 0 }}>Student Management</h3>
+                                <span style={{ 
+                                    fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '20px',
+                                    backgroundColor: hasWriteAccess ? 'rgba(211, 162, 0, 0.15)' : 'rgba(255, 77, 77, 0.15)',
+                                    color: hasWriteAccess ? 'var(--accent-gold)' : '#ff4d4d',
+                                    border: `1px solid ${hasWriteAccess ? 'var(--accent-gold)' : '#ff4d4d'}`,
+                                    display: 'flex', alignItems: 'center', gap: '4px'
+                                }}>
+                                    {hasWriteAccess ? <Shield size={12} /> : <Lock size={12} />}
+                                    {hasWriteAccess ? 'SUPER ADMIN (Full Access)' : 'ADMIN (Read-Only)'}
+                                </span>
+                            </div>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+                                {hasWriteAccess ? 'Add, edit, or remove students and manage records.' : 'View and search student records (Scanning / Read Only).'}
+                            </p>
+                        </div>
+                        {hasWriteAccess ? (
+                            <button 
+                                onClick={handleAddClick}
+                                style={{ 
+                                    backgroundColor: 'var(--accent-gold)', color: 'var(--bg-primary)', 
+                                    padding: '12px 24px', borderRadius: '12px', border: 'none', 
+                                    fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px',
+                                    cursor: 'pointer', transition: 'var(--transition-smooth)',
+                                    boxShadow: '0 4px 15px rgba(211, 162, 0, 0.3)'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                            >
+                                <Plus size={20} /> Add Student
+                            </button>
+                        ) : (
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                Student creation requires Super Admin privileges
+                            </div>
+                        )}
+                    </div>
 
             {/* Search and Table */}
             <div className="glass-effect animate-slide-up" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -180,14 +247,18 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
                                             )}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                                                <button onClick={() => handleEdit(s)} className="action-circle-btn" style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'transparent', color: 'var(--accent-gold)', cursor: 'pointer' }} title="Edit">
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button onClick={() => onDelete(s.phone)} className="action-circle-btn" style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'transparent', color: '#ff4d4d', cursor: 'pointer' }} title="Delete">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
+                                            {hasWriteAccess ? (
+                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                                                    <button onClick={() => handleEdit(s)} className="action-circle-btn" style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'transparent', color: 'var(--accent-gold)', cursor: 'pointer' }} title="Edit">
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button onClick={() => onDelete(s.phone)} className="action-circle-btn" style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'transparent', color: '#ff4d4d', cursor: 'pointer' }} title="Delete">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.5 }}>View Only</span>
+                                            )}
                                         </td>
                                     </tr>
                                     {isEndOfGroup && i !== sortedStudents.length - 1 && <tr style={{ height: '24px' }}><td colSpan="4"></td></tr>}
@@ -270,18 +341,8 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
                     </button>
                 </form>
             </Modal>
-
-            <style>
-                {`
-                    .table-row-hover:hover {
-                        background-color: rgba(255, 255, 255, 0.03) !important;
-                    }
-                    .action-circle-btn:hover {
-                        background-color: rgba(211, 162, 0, 0.1) !important;
-                        transform: scale(1.1);
-                    }
-                `}
-            </style>
+                </>
+            )}
         </div>
     );
 };

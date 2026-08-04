@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStudentByIdentifier, ensureQrToken } from '../utils/studentUtils';
 import logo from '../assets/logo.png';
-import { UserCheck, Shield, Phone, Hash, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 const Login = () => {
     const [identifier, setIdentifier] = useState('');
@@ -147,21 +147,7 @@ const Login = () => {
                     </button>
                 </form>
 
-                {/* Footer links */}
-                <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
-                    <a
-                        href="/register"
-                        style={{ color: '#f5e6c8', opacity: 0.6, textDecoration: 'none' }}
-                    >
-                        Manual Add (Admin)
-                    </a>
-                    <a
-                        href="/admin"
-                        style={{ color: '#d3a200', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    >
-                        <Shield size={14} /> Admin Portal
-                    </a>
-                </div>
+
             </div>
         </div>
     );

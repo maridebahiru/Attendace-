@@ -42,15 +42,16 @@ export const getStudentByIdentifier = async (identifier) => {
   if (!identifier) return null;
   const term = String(identifier).trim();
 
-  // 1. Check direct doc lookup by phone number
+  // 1. Check direct doc lookup by doc ID (e.g. EJAT-0001)
   try {
     const phoneRef = doc(db, 'students', term);
     const phoneSnap = await getDoc(phoneRef);
     if (phoneSnap.exists()) {
-      return { phone: phoneSnap.id, ...phoneSnap.data() };
+      const data = phoneSnap.data();
+      return { docId: phoneSnap.id, ...data, phone: data.phone || data.employeeId || phoneSnap.id };
     }
   } catch (e) {
-    console.log('Phone doc lookup skipped');
+    console.log('Direct doc lookup skipped');
   }
 
   // 2. Query by phone field
@@ -59,7 +60,8 @@ export const getStudentByIdentifier = async (identifier) => {
   const phoneDocs = await getDocs(phoneQuery);
   if (!phoneDocs.empty) {
     const docSnap = phoneDocs.docs[0];
-    return { phone: docSnap.id, ...docSnap.data() };
+    const data = docSnap.data();
+    return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
   }
 
   // 3. Query by employeeId field
@@ -67,7 +69,8 @@ export const getStudentByIdentifier = async (identifier) => {
   const empDocs = await getDocs(empQuery);
   if (!empDocs.empty) {
     const docSnap = empDocs.docs[0];
-    return { phone: docSnap.id, ...docSnap.data() };
+    const data = docSnap.data();
+    return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
   }
 
   // 4. Query by idNo field (fallback)
@@ -75,7 +78,8 @@ export const getStudentByIdentifier = async (identifier) => {
   const idNoDocs = await getDocs(idNoQuery);
   if (!idNoDocs.empty) {
     const docSnap = idNoDocs.docs[0];
-    return { phone: docSnap.id, ...docSnap.data() };
+    const data = docSnap.data();
+    return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
   }
 
   return null;

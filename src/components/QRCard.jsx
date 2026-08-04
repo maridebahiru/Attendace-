@@ -9,7 +9,7 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
     // Ethiopian Geometric Pattern (SVG String for repeating background)
     const borderPattern = `url("data:image/svg+xml,%3Csvg width='40' height='20' viewBox='0 0 40 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10 L10 0 L20 10 L10 20 Z M20 10 L30 0 L40 10 L30 20 Z' fill='none' stroke='%23d3a200' stroke-width='2'/%3E%3C/svg%3E")`;
 
-    const qrValue = qrToken || JSON.stringify({ name, phone, idNo: employeeId || idNo });
+    const qrValue = employeeId || phone || qrToken || JSON.stringify({ name, phone, idNo: employeeId || idNo });
 
     return (
         <div
@@ -73,7 +73,7 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                 {/* Amharic Title */}
                 <h1 style={{
                     color: '#d3a200',
-                    fontSize: '15px',
+                    fontSize: '16px',
                     textAlign: 'center',
                     fontWeight: '900',
                     lineHeight: '1.25',
@@ -81,7 +81,7 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
                     width: '100%',
                     padding: '0 10px'
-                }}>4ኛ ትውልድ ሱባዔ ጉባኤ የተማሪዎች አቴንዳንስ መቆጣጠርያ</h1>
+                }}>4ኛ ትውልድ ሱባዔ ጉባኤ</h1>
 
                 {/* QR Code Container */}
                 <div style={{
@@ -134,7 +134,12 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
 
                     <div style={{ flex: 1 }}>
                         <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase' }}>Full Name</label>
-                        <div style={{ color: '#65081b', fontSize: '18px', fontWeight: '700' }}>{name}</div>
+                        <div style={{ color: '#65081b', fontSize: '17px', fontWeight: '700' }}>{name}</div>
+                        {studentData.christianName && (
+                            <div style={{ color: '#65081b', fontSize: '12px', fontWeight: '600', opacity: 0.9 }}>
+                                የክርስትና ስም: {studentData.christianName}
+                            </div>
+                        )}
                         {(employeeId || idNo) && (
                             <div style={{ color: '#d3a200', backgroundColor: '#65081b', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', marginTop: '3px' }}>
                                 ID: {employeeId || idNo}

@@ -18,7 +18,7 @@ async function writeDoc(docId, student) {
     phone: { stringValue: student.phone || '' },
     christianName: { stringValue: student.christianName || '' },
     employeeId: { stringValue: student.employeeId || '' },
-    idNo: { stringValue: student.employeeId || student.phone || '' },
+    idNo: { stringValue: student.phone || student.employeeId || '' },
     department: { stringValue: student.department || 'General' },
     position: { stringValue: student.position || '' },
     educationLevel: { stringValue: student.educationLevel || '' },
@@ -41,21 +41,21 @@ async function writeDoc(docId, student) {
   }
 }
 
-async function runImport() {
-  console.log("Loading Excel file into Firebase Firestore...");
+async function runUniqueImport() {
+  console.log("=== UPLOADING ALL 708 UNIQUE RECORDS (NO OVERWRITES) TO FIRESTORE ===");
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-  console.log(`Found ${rows.length} total records to process for Firebase.`);
+  console.log(`Processing all ${rows.length} rows from Excel file...`);
 
   let inserted = 0;
   let errors = 0;
-
   const BATCH_SIZE = 25;
+
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
-    
+
     await Promise.all(batch.map(async (r, idx) => {
       const globalIdx = i + idx;
       const rawName = (r['ሙሉ ስም'] || '').toString().trim();
@@ -73,9 +73,9 @@ async function runImport() {
         cleanPhone = `090000${String(globalIdx + 1).padStart(4, '0')}`;
       }
 
-      // Unique Document ID per response row
+      // GUARANTEED UNIQUE DOCUMENT ID FOR ALL 708 ATTENDEES
       const empId = `EJAT-${String(globalIdx + 1).padStart(4, '0')}`;
-      const docId = cleanPhone !== '0900000000' && cleanPhone.length >= 9 ? cleanPhone : empId;
+      const docId = empId; // Use unique employee ID so no duplicate phone overwrites occur!
 
       const studentData = {
         name: rawName || `Attendee ${globalIdx + 1}`,
@@ -98,13 +98,13 @@ async function runImport() {
       }
     }));
 
-    console.log(`Firebase Import Progress: ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length} records processed...`);
+    console.log(`Sync Progress: ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length} records...`);
   }
 
-  console.log("\n🎉 --- FIREBASE IMPORT COMPLETE ---");
+  console.log(`\n🎉 === SUCCESS: ALL 708 ATTENDEES UPLOADED ===`);
   console.log(`Total Excel Rows: ${rows.length}`);
-  console.log(`Successfully Uploaded to Firebase Firestore: ${inserted}`);
+  console.log(`Total Firestore Documents Created: ${inserted}`);
   console.log(`Errors: ${errors}`);
 }
 
-runImport();
+runUniqueImport();

@@ -166,22 +166,42 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                             {student.name}
                         </h2>
 
-                        {/* Highlighted Registered ID from Google Form */}
-                        <div
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                backgroundColor: 'var(--accent-gold)',
-                                color: 'var(--bg-primary)',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                                fontWeight: '900',
-                                letterSpacing: '0.5px'
-                            }}
-                        >
-                            <IdCard size={15} /> Registered ID: {registeredId}
+                        {/* Highlighted Registered ID from Registration / Form */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                            <div
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: 'var(--accent-gold)',
+                                    color: 'var(--bg-primary)',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    fontWeight: '900',
+                                    letterSpacing: '0.5px'
+                                }}
+                            >
+                                <IdCard size={15} /> Registered ID: {registeredId}
+                            </div>
+                            {(student.christianName || student.christian_name) && (
+                                <div
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        backgroundColor: 'rgba(211, 162, 0, 0.15)',
+                                        color: 'var(--accent-gold)',
+                                        border: '1px solid var(--accent-gold)',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '700'
+                                    }}
+                                >
+                                    የክርስትና ስም: {student.christianName || student.christian_name}
+                                </div>
+                            )}
                         </div>
 
                         <div
@@ -196,12 +216,12 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                         >
                             {student.phone && (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Phone size={13} /> {student.phone}
+                                    <Phone size={13} /> Phone: {student.phone}
                                 </span>
                             )}
-                            {student.department && (
+                            {(student.department || student.church) && (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Building size={13} /> {student.department}
+                                    <Building size={13} /> {student.department || student.church}
                                 </span>
                             )}
                             {student.position && (

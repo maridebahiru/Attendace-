@@ -107,12 +107,15 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
                         <div style={{ flex: 1 }}>
                             <h3 style={{ color: 'var(--text-primary)', margin: 0, fontSize: '18px', fontWeight: '800' }}>{lastScannedResult.student.name}</h3>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                <span><IdCard size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.employeeId || lastScannedResult.student.idNo || lastScannedResult.student.phone}</span>
-                                {lastScannedResult.student.department && (
-                                    <span><Building size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.department}</span>
+                                <span><IdCard size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--accent-gold)' }} /> ID: <strong style={{ color: 'var(--accent-gold)' }}>{lastScannedResult.student.employeeId || lastScannedResult.student.idNo || lastScannedResult.student.phone}</strong></span>
+                                {lastScannedResult.student.phone && (
+                                    <span><Phone size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.phone}</span>
                                 )}
-                                {lastScannedResult.student.position && (
-                                    <span><Briefcase size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.position}</span>
+                                {(lastScannedResult.student.christianName || lastScannedResult.student.christian_name) && (
+                                    <span>የክርስትና ስም: <strong>{lastScannedResult.student.christianName || lastScannedResult.student.christian_name}</strong></span>
+                                )}
+                                {(lastScannedResult.student.department || lastScannedResult.student.church) && (
+                                    <span><Building size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.department || lastScannedResult.student.church}</span>
                                 )}
                             </div>
                         </div>

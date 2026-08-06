@@ -18,7 +18,7 @@ import AdminScannedIDModal from '../components/admin/AdminScannedIDModal';
 import { TabButton } from '../components/admin/AdminShared';
 import { getStudentByQrToken, getStudentByIdentifier } from '../utils/studentUtils';
 import { exportToCSV } from '../utils/exportUtils';
-import { checkPermission, logSuperAdminAudit, getUserRole } from '../utils/rbac';
+import { checkPermission, logSuperAdminAudit, getUserRole, isSuperAdmin } from '../utils/rbac';
 
 const Admin = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
@@ -56,7 +56,8 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [attendance, setAttendance] = useState([]);
     const [isScannerActive, setIsScannerActive] = useState(false);
     const [scanner, setScanner] = useState(null);
-    const [activeTab, setActiveTab] = useState('overview');
+    const superAdmin = isSuperAdmin();
+    const [activeTab, setActiveTab] = useState(superAdmin ? 'overview' : 'scanner');
     const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState(null);
     const [lastScannedResult, setLastScannedResult] = useState(null);
     const [scannedModalData, setScannedModalData] = useState(null);
@@ -355,16 +356,18 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 </div>
 
                 <nav style={{ flex: 1, padding: '0 12px', display: 'flex', flexDirection: 'column' }} className="custom-scroll">
-                    <NavSection title="INTELLIGENCE">
-                        <TabButton 
-                            vertical icon={<LayoutDashboard size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Overview" : ""} 
-                            active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} 
-                        />
-                        <TabButton 
-                            vertical icon={<Calendar size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Date Analysis" : ""} 
-                            active={activeTab === 'date'} onClick={() => { setActiveTab('date'); setIsMobileMenuOpen(false); }} 
-                        />
-                    </NavSection>
+                    {superAdmin && (
+                        <NavSection title="INTELLIGENCE">
+                            <TabButton 
+                                vertical icon={<LayoutDashboard size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Overview" : ""} 
+                                active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} 
+                            />
+                            <TabButton 
+                                vertical icon={<Calendar size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Date Analysis" : ""} 
+                                active={activeTab === 'date'} onClick={() => { setActiveTab('date'); setIsMobileMenuOpen(false); }} 
+                            />
+                        </NavSection>
+                    )}
 
                     <NavSection title="CONTROL">
                         <TabButton 
@@ -378,10 +381,12 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             vertical icon={<Database size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Students" : ""} 
                             active={activeTab === 'data'} onClick={() => { setActiveTab('data'); setIsMobileMenuOpen(false); }} 
                         />
-                        <TabButton 
-                            vertical icon={<Users size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Users" : ""} 
-                            active={activeTab === 'users'} onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
-                        />
+                        {superAdmin && (
+                            <TabButton 
+                                vertical icon={<Users size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Users" : ""} 
+                                active={activeTab === 'users'} onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
+                            />
+                        )}
                     </NavSection>
                 </nav>
 
@@ -438,20 +443,24 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                     </div>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button onClick={exportCSV} className="header-action-btn" title="Export Data">
-                                <Database size={16} /> <span className="hide-mobile">Export</span>
-                            </button>
-                        </div>
-                        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--glass-border)' }} className="hide-mobile"></div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }} className="hide-mobile">
+                        {superAdmin && (
+                            <>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button onClick={exportCSV} className="header-action-btn" title="Export Data">
+                                        <Database size={16} /> <span className="hide-mobile">Export</span>
+                                    </button>
+                                </div>
+                                <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--glass-border)' }} className="hide-mobile"></div>
+                            </>
+                        )}
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                             {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                         </div>
                     </div>
                 </header>
 
                 <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
-                    {activeTab === 'overview' && <AdminOverviewTab students={students} attendance={attendance} />}
+                    {activeTab === 'overview' && superAdmin && <AdminOverviewTab students={students} attendance={attendance} />}
                     {activeTab === 'scanner' && (
                         <AdminScannerTab 
                             isScannerActive={isScannerActive} 
@@ -468,7 +477,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             manualCheckIn={manualCheckIn}
                         />
                     )}
-                    {activeTab === 'users' && (
+                    {activeTab === 'users' && superAdmin && (
                         <AdminUserManagementTab 
                             students={students} 
                             onAdd={handleAddStudent}
@@ -476,7 +485,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             onDelete={handleDeleteStudent}
                         />
                     )}
-                    {activeTab === 'date' && <AdminDateAnalysisTab students={students} attendance={attendance} />}
+                    {activeTab === 'date' && superAdmin && <AdminDateAnalysisTab students={students} attendance={attendance} />}
                 </div>
 
                 <AdminAnalyticsModal 

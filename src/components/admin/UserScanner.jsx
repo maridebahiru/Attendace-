@@ -432,11 +432,18 @@ const UserScanner = ({ supabase = defaultSupabase, currentUser }) => {
                             )}
 
                             {selectedUser.id_photo_url && (
-                                <div style={{ padding: '10px 14px', backgroundColor: 'rgba(211, 162, 0, 0.08)', borderRadius: '10px', border: '1px solid rgba(211, 162, 0, 0.2)' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#d3a200', textTransform: 'uppercase' }}>መታወቂያ (ID Photo Attachment)</div>
-                                    <a href={selectedUser.id_photo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.85rem', color: '#d3a200', fontWeight: '700', textDecoration: 'underline', marginTop: '4px', display: 'inline-block' }}>
-                                        🔗 View Uploaded ID Photo Document →
-                                    </a>
+                                <div style={{ padding: '12px 14px', backgroundColor: 'rgba(211, 162, 0, 0.08)', borderRadius: '10px', border: '1px solid rgba(211, 162, 0, 0.3)', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#d3a200', textTransform: 'uppercase', marginBottom: '8px' }}>መታወቂያ (ID Photo Attachment)</div>
+                                    <img
+                                        src={selectedUser.id_photo_url}
+                                        alt="Uploaded ID Photo"
+                                        style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #d3a200', marginBottom: '8px' }}
+                                    />
+                                    <div>
+                                        <a href={selectedUser.id_photo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.85rem', color: '#d3a200', fontWeight: '700', textDecoration: 'underline', display: 'inline-block' }}>
+                                            🔗 View High-Res ID Document →
+                                        </a>
+                                    </div>
                                 </div>
                             )}
 

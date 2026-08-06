@@ -1,13 +1,19 @@
-import React from 'react';
-import { X, CheckCircle2, AlertCircle, IdCard, User, Building, Briefcase, Phone, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CheckCircle2, AlertCircle, IdCard, User, Building, Briefcase, Phone, ShieldCheck, Eye, ExternalLink, Image, Maximize2 } from 'lucide-react';
 import QRCard from '../QRCard';
 
 const AdminScannedIDModal = ({ scanResult, onClose }) => {
+    const [showUploadedId, setShowUploadedId] = useState(false);
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
     if (!scanResult || !scanResult.student) return null;
 
     const { student, status, scannedAt } = scanResult;
     const isSuccess = status === 'success';
     const registeredId = student.employeeId || student.idNo || student.phone;
+
+    // Check all possible field names for uploaded ID photo/document URL
+    const uploadedIdPhoto = student.id_photo_url || student.idPhotoUrl || student.idUrl || student.id_url || student.uploadedIdUrl || student.idCardUrl || student.profilePhotoUrl;
 
     return (
         <div
@@ -34,7 +40,7 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                 onClick={(e) => e.stopPropagation()}
                 style={{
                     width: '100%',
-                    maxWidth: '540px',
+                    maxWidth: '560px',
                     maxHeight: '90vh',
                     backgroundColor: 'rgba(25, 10, 15, 0.95)',
                     borderRadius: '24px',
@@ -117,21 +123,24 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                         borderRadius: '16px',
                         backgroundColor: 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid var(--glass-border)',
-                        marginBottom: '20px'
+                        marginBottom: '16px'
                     }}
                 >
-                    {student.profilePhotoUrl ? (
+                    {uploadedIdPhoto ? (
                         <img
-                            src={student.profilePhotoUrl}
+                            src={uploadedIdPhoto}
                             alt={student.name}
                             style={{
                                 width: '70px',
                                 height: '70px',
                                 borderRadius: '50%',
                                 objectFit: 'cover',
-                                border: '2px solid var(--accent-gold)'
+                                border: '2px solid var(--accent-gold)',
+                                cursor: 'pointer'
                             }}
+                            onClick={() => setIsLightboxOpen(true)}
                             onError={(e) => { e.target.style.display = 'none'; }}
+                            title="Click to expand photo"
                         />
                     ) : (
                         <div
@@ -233,6 +242,147 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                     </div>
                 </div>
 
+                {/* View Uploaded ID Button */}
+                <button
+                    onClick={() => setShowUploadedId(!showUploadedId)}
+                    style={{
+                        width: '100%',
+                        padding: '12px 18px',
+                        borderRadius: '14px',
+                        border: '1.5px solid var(--accent-gold)',
+                        backgroundColor: showUploadedId ? 'var(--accent-gold)' : 'rgba(211, 162, 0, 0.12)',
+                        color: showUploadedId ? 'var(--bg-primary)' : 'var(--accent-gold)',
+                        fontWeight: '800',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        marginBottom: '20px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: showUploadedId ? '0 4px 15px rgba(211, 162, 0, 0.3)' : 'none'
+                    }}
+                >
+                    <Eye size={18} />
+                    {showUploadedId ? "Hide Uploaded ID Document" : "View Uploaded ID Photo / Document"}
+                </button>
+
+                {/* Uploaded ID Document Section */}
+                {showUploadedId && (
+                    <div
+                        className="animate-fade-in"
+                        style={{
+                            padding: '18px',
+                            borderRadius: '16px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            border: '1px solid var(--accent-gold)',
+                            marginBottom: '20px',
+                            textAlign: 'center'
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: '12px',
+                                fontWeight: '800',
+                                color: 'var(--accent-gold)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px',
+                                marginBottom: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <Image size={16} />
+                            Uploaded Student ID Attachment
+                        </div>
+
+                        {uploadedIdPhoto ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                <div
+                                    style={{
+                                        position: 'relative',
+                                        borderRadius: '12px',
+                                        overflow: 'hidden',
+                                        border: '2px solid var(--accent-gold)',
+                                        maxHeight: '280px',
+                                        width: '100%',
+                                        backgroundColor: '#000',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <img
+                                        src={uploadedIdPhoto}
+                                        alt={`Uploaded ID of ${student.name}`}
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '280px',
+                                            objectFit: 'contain'
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => setIsLightboxOpen(true)}
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: '10px',
+                                            right: '10px',
+                                            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                                            color: 'var(--accent-gold)',
+                                            border: '1px solid var(--accent-gold)',
+                                            borderRadius: '8px',
+                                            padding: '6px 12px',
+                                            fontSize: '12px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        <Maximize2 size={13} /> Fullscreen
+                                    </button>
+                                </div>
+
+                                <a
+                                    href={uploadedIdPhoto}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: '700',
+                                        color: 'var(--accent-gold)',
+                                        textDecoration: 'none',
+                                        backgroundColor: 'rgba(211, 162, 0, 0.1)',
+                                        padding: '6px 14px',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(211, 162, 0, 0.3)'
+                                    }}
+                                >
+                                    <ExternalLink size={14} /> Open Original High-Res File
+                                </a>
+                            </div>
+                        ) : (
+                            <div
+                                style={{
+                                    padding: '24px',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '13px',
+                                    fontStyle: 'italic'
+                                }}
+                            >
+                                No uploaded ID image document found for this student record.
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Digital ID Card Preview */}
                 <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                     <div
@@ -294,6 +444,64 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                     Done / Scan Next Student
                 </button>
             </div>
+
+            {/* Lightbox Fullscreen Modal for Uploaded ID Image */}
+            {isLightboxOpen && uploadedIdPhoto && (
+                <div
+                    onClick={() => setIsLightboxOpen(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.92)',
+                        backdropFilter: 'blur(10px)',
+                        zIndex: 10000,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }}
+                >
+                    <button
+                        onClick={() => setIsLightboxOpen(false)}
+                        style={{
+                            position: 'absolute',
+                            top: '20px',
+                            right: '20px',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            border: 'none',
+                            color: '#fff',
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <X size={24} />
+                    </button>
+
+                    <div style={{ color: 'var(--accent-gold)', fontWeight: '800', fontSize: '16px', marginBottom: '14px' }}>
+                        ID Document Attachment — {student.name} ({registeredId})
+                    </div>
+
+                    <img
+                        src={uploadedIdPhoto}
+                        alt={`Full ID of ${student.name}`}
+                        style={{
+                            maxWidth: '90vw',
+                            maxHeight: '80vh',
+                            objectFit: 'contain',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.8)',
+                            border: '2px solid var(--accent-gold)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
         </div>
     );
 };

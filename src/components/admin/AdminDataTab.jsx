@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Download, UserCheck, BarChart2, Hash, Phone, Clock, Calendar as CalendarIcon, UserPlus, ChevronDown, X, FileSpreadsheet, FileText, Filter } from 'lucide-react';
 import { exportToCSV, exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { isSuperAdmin } from '../../utils/rbac';
 
 const AdminDataTab = ({ 
     students, 
@@ -15,6 +16,8 @@ const AdminDataTab = ({
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [selectedDepartment, setSelectedDepartment] = useState('All');
+
+    const superAdmin = isSuperAdmin();
 
     // Get unique departments list
     const departmentsList = ['All', ...new Set(students.map(s => s.department || 'General').filter(Boolean))];
@@ -77,25 +80,31 @@ const AdminDataTab = ({
 
     return (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: window.innerWidth <= 768 ? '16px' : '24px' }}>
-            {/* Header / Actions Section */}
+            {/* Header Section */}
             <div className="glass-effect" style={{ padding: window.innerWidth <= 768 ? '16px' : '24px', borderRadius: 'var(--radius-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
                 <div>
-                    <h3 style={{ color: 'var(--accent-gold)', fontSize: window.innerWidth <= 768 ? '18px' : '20px', margin: 0 }}>Student Directory & Export Center</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>Browse {students.length} registered students and export detailed attendance reports.</p>
+                    <h3 style={{ color: 'var(--accent-gold)', fontSize: window.innerWidth <= 768 ? '18px' : '20px', margin: 0 }}>
+                        {superAdmin ? "Student Directory & Export Center" : "Student Directory"}
+                    </h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+                        Browse {students.length} registered students{superAdmin ? " and export detailed attendance reports." : "."}
+                    </p>
                 </div>
 
-                {/* Multi-Format Export Buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <button onClick={handleExportCSV} style={actionBtnStyle}>
-                        <Download size={15} /> CSV
-                    </button>
-                    <button onClick={handleExportExcel} style={{ ...actionBtnStyle, backgroundColor: 'rgba(0, 255, 128, 0.1)', color: '#00ff80', border: '1px solid rgba(0, 255, 128, 0.3)' }}>
-                        <FileSpreadsheet size={15} /> Excel
-                    </button>
-                    <button onClick={handleExportPDF} style={{ ...actionBtnStyle, backgroundColor: 'rgba(255, 77, 77, 0.1)', color: '#ff4d4d', border: '1px solid rgba(255, 77, 77, 0.3)' }}>
-                        <FileText size={15} /> PDF
-                    </button>
-                </div>
+                {/* Multi-Format Export Buttons (Super Admin Only) */}
+                {superAdmin && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <button onClick={handleExportCSV} style={actionBtnStyle}>
+                            <Download size={15} /> CSV
+                        </button>
+                        <button onClick={handleExportExcel} style={{ ...actionBtnStyle, backgroundColor: 'rgba(0, 255, 128, 0.1)', color: '#00ff80', border: '1px solid rgba(0, 255, 128, 0.3)' }}>
+                            <FileSpreadsheet size={15} /> Excel
+                        </button>
+                        <button onClick={handleExportPDF} style={{ ...actionBtnStyle, backgroundColor: 'rgba(255, 77, 77, 0.1)', color: '#ff4d4d', border: '1px solid rgba(255, 77, 77, 0.3)' }}>
+                            <FileText size={15} /> PDF
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Filter Bar */}

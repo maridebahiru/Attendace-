@@ -13,6 +13,26 @@ export const generateQrToken = () => {
 };
 
 /**
+ * Cleans scanned QR code values and tokens by removing control characters,
+ * linebreaks, quotes, BOM, and extra whitespace.
+ */
+export const cleanScannedToken = (val) => {
+  if (val === null || val === undefined) return '';
+  let str = String(val);
+  // Remove BOM and null bytes
+  str = str.replace(/[\uFEFF\0]/g, '');
+  // Remove carriage returns and line feeds
+  str = str.replace(/[\r\n]+/g, '');
+  // Trim outer whitespace
+  str = str.trim();
+  // Remove wrapping quotes if present (e.g. "QR_123" -> QR_123)
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    str = str.slice(1, -1).trim();
+  }
+  return str;
+};
+
+/**
  * Ensures that the student document has a permanent qrToken.
  * If qrToken is missing, generates one and updates Firestore.
  * Returns the updated student object.

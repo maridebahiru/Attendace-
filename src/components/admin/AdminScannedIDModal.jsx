@@ -6,7 +6,125 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
     const [showUploadedId, setShowUploadedId] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-    if (!scanResult || !scanResult.student) return null;
+    console.log('[SCANNER DEBUG 5] Modal Render - Rendering AdminScannedIDModal with scanResult:', scanResult);
+
+    if (!scanResult) return null;
+
+    // Handle Error Popup Modal when student lookup fails or error occurs
+    if (scanResult.status === 'error' || !scanResult.student) {
+        const errorMsg = scanResult.errorMsg || scanResult.message || 'Scanned student record was not found in the database.';
+        const tokenDisplay = scanResult.token || scanResult.rawToken || 'N/A';
+
+        return (
+            <div
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(10, 3, 6, 0.88)',
+                    backdropFilter: 'blur(14px)',
+                    WebkitBackdropFilter: 'blur(14px)',
+                    zIndex: 99999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    overflowY: 'auto'
+                }}
+                onClick={onClose}
+            >
+                <div
+                    className="glass-effect animate-slide-up"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        width: '100%',
+                        maxWidth: '480px',
+                        backgroundColor: 'rgba(30, 10, 15, 0.96)',
+                        borderRadius: '24px',
+                        border: '1.5px solid rgba(255, 77, 77, 0.5)',
+                        boxShadow: '0 20px 50px rgba(255, 77, 77, 0.25)',
+                        padding: window.innerWidth <= 768 ? '24px' : '32px',
+                        textAlign: 'center',
+                        position: 'relative'
+                    }}
+                >
+                    <button
+                        onClick={onClose}
+                        style={{
+                            position: 'absolute',
+                            top: '18px',
+                            right: '18px',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid var(--glass-border)',
+                            color: 'var(--text-primary)',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <X size={18} />
+                    </button>
+
+                    <div style={{
+                        width: '64px', height: '64px', borderRadius: '50%',
+                        backgroundColor: 'rgba(255, 77, 77, 0.15)', border: '2px solid #ff4d4d',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 16px', color: '#ff4d4d'
+                    }}>
+                        <AlertCircle size={36} />
+                    </div>
+
+                    <h2 style={{ color: '#ff4d4d', fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>
+                        Scan Lookup Failed
+                    </h2>
+
+                    <p style={{ color: 'var(--text-primary)', fontSize: '14px', marginBottom: '16px', lineHeight: '1.5' }}>
+                        {errorMsg}
+                    </p>
+
+                    {tokenDisplay && (
+                        <div style={{
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            border: '1px solid var(--glass-border)',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            fontSize: '12px',
+                            color: 'var(--accent-gold)',
+                            marginBottom: '24px',
+                            wordBreak: 'break-all',
+                            fontFamily: 'monospace'
+                        }}>
+                            Scanned Payload: {tokenDisplay}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={onClose}
+                        style={{
+                            width: '100%',
+                            padding: '14px',
+                            borderRadius: '14px',
+                            backgroundColor: '#ff4d4d',
+                            color: '#fff',
+                            fontWeight: '800',
+                            fontSize: '15px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 6px 20px rgba(255, 77, 77, 0.4)'
+                        }}
+                    >
+                        Dismiss / Try Scanning Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const { student, status, scannedAt } = scanResult;
     const isSuccess = status === 'success';
@@ -26,7 +144,7 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                 backgroundColor: 'rgba(10, 3, 6, 0.85)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                zIndex: 9999,
+                zIndex: 99999,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

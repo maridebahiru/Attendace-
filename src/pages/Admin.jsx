@@ -16,7 +16,7 @@ import AdminUserManagementTab from '../components/admin/AdminUserManagementTab';
 import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
 import AdminScannedIDModal from '../components/admin/AdminScannedIDModal';
 import { TabButton } from '../components/admin/AdminShared';
-import { getStudentByQrToken, getStudentByIdentifier } from '../utils/studentUtils';
+import { getStudentByQrToken, getStudentByIdentifier, cleanScannedToken } from '../utils/studentUtils';
 import { exportToCSV } from '../utils/exportUtils';
 import { checkPermission, logSuperAdminAudit, getUserRole, isSuperAdmin } from '../utils/rbac';
 
@@ -129,24 +129,42 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
     const onScanSuccess = async (decodedText) => {
         try {
-            const textStr = String(decodedText).trim();
-            if (!textStr) return;
+            console.log('[SCANNER DEBUG 1] Scan Success - Raw input:', decodedText);
+            const textStr = cleanScannedToken(decodedText);
+            console.log('[SCANNER DEBUG 1] Scan Success - Cleaned input:', textStr);
+
+            if (!textStr) {
+                console.warn('[SCANNER DEBUG 1] Cleaned scan input is empty.');
+                return;
+            }
+
+            console.log('[SCANNER DEBUG 2] Lookup Start - Searching for cleaned token:', textStr);
 
             let targetStudent = null;
 
             // 1. Check direct identifier lookup (Employee ID e.g. EJAT-0001, Phone number, or Doc ID)
-            targetStudent = await getStudentByIdentifier(textStr);
+            try {
+                targetStudent = await getStudentByIdentifier(textStr);
+            } catch (err) {
+                console.error('[SCANNER DEBUG 2.5] getStudentByIdentifier error:', err);
+            }
 
             // 2. Check QR Token (e.g. QR_xxxx)
             if (!targetStudent) {
-                targetStudent = await getStudentByQrToken(textStr);
+                try {
+                    targetStudent = await getStudentByQrToken(textStr);
+                } catch (err) {
+                    console.error('[SCANNER DEBUG 2.5] getStudentByQrToken error:', err);
+                }
             }
 
             // 3. Check JSON payload string
-            if (!targetStudent) {
+            if (!targetStudent && textStr.includes('{') && textStr.includes('}')) {
                 try {
-                    const data = JSON.parse(textStr);
-                    const identifier = data.phone || data.idNo || data.employeeId;
+                    const jsonStart = textStr.indexOf('{');
+                    const jsonEnd = textStr.lastIndexOf('}');
+                    const data = JSON.parse(textStr.substring(jsonStart, jsonEnd + 1));
+                    const identifier = cleanScannedToken(data.phone || data.idNo || data.employeeId || data.t || data.qrToken);
                     if (identifier) {
                         targetStudent = await getStudentByIdentifier(identifier);
                     }
@@ -155,16 +173,26 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             name: data.name || 'Attendee',
                             phone: data.phone || data.idNo || 'N/A',
                             employeeId: data.idNo || data.employeeId || 'N/A',
-                            department: 'General'
+                            department: data.department || 'General'
                         };
                     }
                 } catch (e) {
-                    // Ignore JSON parse error
+                    console.warn('[SCANNER DEBUG 2] JSON payload parsing fallback warning:', e);
                 }
             }
 
+            console.log('[SCANNER DEBUG 3] Lookup Result - Target student found:', targetStudent);
+
             if (!targetStudent || !targetStudent.phone) {
+                console.log('[SCANNER DEBUG 4] Popup Trigger (Failed Lookup) - Showing error popup modal for token:', textStr);
                 showToast("Unrecognized QR Code token", "error");
+                const errRes = {
+                    status: 'error',
+                    errorMsg: `Unrecognized QR Code token "${textStr}". No student record found in database.`,
+                    token: textStr,
+                    scannedAt: new Date()
+                };
+                setScannedModalData(errRes);
                 return;
             }
 
@@ -179,8 +207,9 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             if (docSnap.exists()) {
                 showToast(`Already checked in: ${targetStudent.name}`, "warning");
                 const res = { student: targetStudent, status: 'already_checked_in', scannedAt: new Date() };
+                console.log('[SCANNER DEBUG 4] Popup Trigger (Already Checked In) - Triggering modal visibility:', res);
                 setLastScannedResult(res);
-                setScannedModalData(res);
+                setScannedModalData({ ...res });
                 return;
             }
 
@@ -198,11 +227,20 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
             showToast(`✅ Checked in: ${targetStudent.name}`);
             const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
+            console.log('[SCANNER DEBUG 4] Popup Trigger (Success) - Triggering modal visibility:', res);
             setLastScannedResult(res);
-            setScannedModalData(res);
+            setScannedModalData({ ...res });
         } catch (e) {
-            console.error("Scan error:", e);
+            console.error("[SCANNER DEBUG ERROR] Scan processing error:", e);
             showToast("Scan processing error", "error");
+            const errRes = {
+                status: 'error',
+                errorMsg: e.message || "An unexpected error occurred during scan lookup.",
+                token: decodedText,
+                scannedAt: new Date()
+            };
+            console.log('[SCANNER DEBUG 4] Popup Trigger (Exception Error) - Triggering error popup modal');
+            setScannedModalData(errRes);
         }
     };
 
@@ -494,11 +532,6 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                     setSelectedStudentForAnalytics={setSelectedStudentForAnalytics} 
                 />
 
-                <AdminScannedIDModal 
-                    scanResult={scannedModalData} 
-                    onClose={() => setScannedModalData(null)} 
-                />
-
                 {toast && (
                     <div 
                         className="animate-slide-up"
@@ -516,6 +549,11 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                     </div>
                 )}
             </main>
+
+            <AdminScannedIDModal 
+                scanResult={scannedModalData} 
+                onClose={() => setScannedModalData(null)} 
+            />
         </div>
     );
 };

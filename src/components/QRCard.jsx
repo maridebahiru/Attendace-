@@ -173,8 +173,8 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     justifyContent: 'center'
                 }}>
                     <div style={{ zIndex: 1, textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
-                        <div>ኢጃት-ድሬ 2018 ዓ/ም</div>
-                        <div style={{ fontSize: '14px', marginTop: '2px' }}>Valid Until end of course </div>
+                        <div style={{ fontSize: '13px', fontWeight: '800' }}>ሱባዔ ጉባኤ 4ኛ ትውልድ</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '2px' }}>ድሬዳዋ</div>
                     </div>
                     {/* Add an overlay if the background image is too bright */}
                     <div style={{

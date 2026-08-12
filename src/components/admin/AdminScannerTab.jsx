@@ -1,8 +1,8 @@
 import React from 'react';
-import { QrCode, Camera, Shield, AlertCircle, CameraOff, CheckCircle2, User, Building, Briefcase, Mail, Phone, IdCard } from 'lucide-react';
+import { QrCode, Camera, Shield, AlertCircle, CameraOff, CheckCircle2, User, Building, Briefcase, Mail, Phone, IdCard, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { cleanChristianName } from '../../utils/studentUtils';
 
-const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult, onOpenModal, isGreenFlash }) => (
+const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult, onOpenModal, isGreenFlash, syncState, hasStudentsCached }) => (
     <div className="animate-fade-in" style={{ maxWidth: '750px', margin: '0 auto' }}>
         <div className="glass-effect" style={{ padding: window.innerWidth <= 768 ? '20px' : '36px', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
             <div style={{
@@ -17,6 +17,27 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', maxWidth: '450px', margin: '0 auto 24px' }}>
                 Scan personal QR code tokens to record attendance instantly.
             </p>
+
+            {!hasStudentsCached && !syncState?.isOnline && (
+                <div style={{
+                    backgroundColor: 'rgba(255, 140, 0, 0.15)',
+                    border: '1.5px solid #ff8c00',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    marginBottom: '20px',
+                    color: '#ff8c00',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    textAlign: 'left'
+                }}>
+                    <AlertCircle size={24} style={{ flexShrink: 0 }} />
+                    <div>
+                        <strong>Offline Mode Notice:</strong> No cached student data found on this device. Connect to the internet once to load the student list before scanning offline.
+                    </div>
+                </div>
+            )}
 
             <div
                 style={{
@@ -39,9 +60,11 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
                 )}
 
                 {isScannerActive && (
-                    <div style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: 'rgba(0,0,0,0.6)', padding: '5px 12px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isGreenFlash ? '#00ff80' : '#00ff00', boxShadow: '0 0 10px #00ff00' }}></div>
-                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff' }}>{isGreenFlash ? '⚡ READ SUCCESS' : 'ULTRA-FAST SCANNER ACTIVE'}</span>
+                    <div style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: 'rgba(0,0,0,0.65)', padding: '6px 14px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10, border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isGreenFlash ? '#00ff80' : syncState?.isOnline ? '#00ff00' : '#ff8c00', boxShadow: `0 0 10px ${isGreenFlash ? '#00ff80' : syncState?.isOnline ? '#00ff00' : '#ff8c00'}` }}></div>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff' }}>
+                            {isGreenFlash ? '⚡ READ SUCCESS' : syncState?.isOnline ? 'LIVE SCANNER ACTIVE' : `OFFLINE SCANNER (${syncState?.pendingCount || 0} PENDING)`}
+                        </span>
                     </div>
                 )}
             </div>

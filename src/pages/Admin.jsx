@@ -5,7 +5,10 @@ import {
     serverTimestamp, deleteDoc, getDocs, writeBatch, query, where
 } from 'firebase/firestore';
 import { Html5Qrcode } from 'html5-qrcode';
-import { LogOut, LayoutDashboard, Database, Camera, Users, Calendar, Menu, X, ChevronRight, AlertCircle, UserCheck } from 'lucide-react';
+import { LogOut, LayoutDashboard, Database, Camera, Users, Calendar, Menu, X, ChevronRight, AlertCircle, UserCheck, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+
+import { saveStudentsLocal, getStudentsLocal, isAlreadyCheckedInLocal, markCheckedInLocal, queuePendingAttendance } from '../utils/offlineStorage';
+import { subscribeSyncState, syncPendingAttendance, getNetworkStatus } from '../utils/syncManager';
 
 import AdminLogin from '../components/admin/AdminLogin';
 import AdminOverviewTab from '../components/admin/AdminOverviewTab';
@@ -65,8 +68,46 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+    const [syncState, setSyncState] = useState({
+        isOnline: getNetworkStatus(),
+        isSyncing: false,
+        pendingCount: 0,
+        lastSyncTime: null
+    });
+    const [isRefreshingList, setIsRefreshingList] = useState(false);
+
     const scanLockRef = useRef(false);
     const lastScanRef = useRef({ token: '', time: 0 });
+
+    useEffect(() => {
+        const unsubscribe = subscribeSyncState((state) => {
+            setSyncState(state);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleManualRefreshStudents = async () => {
+        setIsRefreshingList(true);
+        if (!getNetworkStatus()) {
+            showToast("Offline mode: Cannot refresh database while disconnected", "warning");
+            setIsRefreshingList(false);
+            return;
+        }
+        try {
+            const q = collection(db, "students");
+            const snap = await getDocs(q);
+            const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+            setStudents(list);
+            await saveStudentsLocal(list);
+            await syncPendingAttendance(db);
+            showToast(`✅ Refreshed & cached ${list.length} student records locally`);
+        } catch (e) {
+            console.error('Manual refresh error:', e);
+            showToast("Failed to refresh student list", "error");
+        } finally {
+            setIsRefreshingList(false);
+        }
+    };
 
     const playAudioBeep = (type = 'success') => {
         try {
@@ -115,15 +156,42 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     };
 
     useEffect(() => {
+        // Load student directory from IndexedDB on startup (instant offline fallback)
+        getStudentsLocal().then((cached) => {
+            if (cached && cached.length > 0) {
+                setStudents(cached);
+            }
+        });
+
         const qStudents = collection(db, "students");
         const unsubStudents = onSnapshot(qStudents, (snap) => {
-            setStudents(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
+            const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+            setStudents(list);
+            saveStudentsLocal(list);
+        }, (err) => {
+            console.warn('[Admin] Firestore student listener offline fallback:', err);
+            getStudentsLocal().then(cached => {
+                if (cached && cached.length > 0) setStudents(cached);
+            });
         });
 
         const qAttendance = collection(db, "attendance");
         const unsubAttendance = onSnapshot(qAttendance, (snap) => {
             setAttendance(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
+        }, (err) => {
+            console.warn('[Admin] Firestore attendance listener offline fallback:', err);
         });
+
+        const handleOnline = () => {
+            console.log('[Admin] Internet reconnected. Auto-syncing pending attendance records...');
+            syncPendingAttendance(db);
+        };
+
+        window.addEventListener('online', handleOnline);
+
+        if (getNetworkStatus()) {
+            syncPendingAttendance(db);
+        }
 
         const handleResize = () => {
             if (window.innerWidth <= 768) {
@@ -137,6 +205,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         return () => {
             unsubStudents();
             unsubAttendance();
+            window.removeEventListener('online', handleOnline);
             window.removeEventListener('resize', handleResize);
         };
     }, []);
@@ -258,16 +327,22 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             }
 
             // STEP 4: INSTANT IN-MEMORY ATTENDANCE CHECK (0ms network delay)
+            // STEP 4: DUPLICATE CHECK-IN (In-Memory attendance state + IndexedDB checkedIn store)
             const today = new Date().toISOString().split('T')[0];
             const targetPhone = String(targetStudent.phone || '').trim();
             const targetEmp = String(targetStudent.employeeId || targetStudent.idNo || '').trim();
 
-            const isAlreadyCheckedIn = attendance.some(a => {
+            const isAlreadyCheckedInState = attendance.some(a => {
                 if (a.date !== today) return false;
                 const aPhone = String(a.phone || '').trim();
                 const aEmp = String(a.employeeId || a.idNo || '').trim();
                 return (targetPhone && aPhone === targetPhone) || (targetEmp && aEmp === targetEmp);
             });
+
+            const isAlreadyCheckedInIDB = (await isAlreadyCheckedInLocal(targetPhone, today)) ||
+                                          (await isAlreadyCheckedInLocal(targetEmp, today));
+
+            const isAlreadyCheckedIn = isAlreadyCheckedInState || isAlreadyCheckedInIDB;
 
             // Trigger instant green visual indicator flash
             setIsGreenFlash(true);
@@ -282,30 +357,47 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 return;
             }
 
-            // STEP 5: INSTANT OPTIMISTIC UI RESPONSE & BACKGROUND FIRESTORE WRITE
+            // STEP 5: OPTIMISTIC UI RESPONSE & FIRESTORE WRITE / INDEXEDDB OFFLINE QUEUE
             playAudioBeep('success');
-            showToast(`✅ Checked in: ${targetStudent.name}`);
-            const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
-            setLastScannedResult(res);
-            setScannedModalData({ ...res });
-
-            // Asynchronous Firestore check-in write in background
-            const docId = `${targetStudent.phone}_${today}`;
-            const docRef = doc(db, "attendance", docId);
+            const docId = `${targetPhone || targetEmp}_${today}`;
             const adminIdentity = getAdminIdentity();
             const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
 
-            setDoc(docRef, {
+            const recordData = {
                 studentName: targetStudent.name,
                 phone: targetStudent.phone,
                 employeeId: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
                 idNo: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
                 department: targetStudent.department || 'General',
                 date: today,
-                scannedAt: serverTimestamp(),
+                scannedAt: new Date().toISOString(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr
-            }).catch(err => console.error('Background attendance write error:', err));
+            };
+
+            // Mark locally in IndexedDB immediately to prevent double scanning offline or online
+            markCheckedInLocal(targetPhone, today, targetStudent.name);
+            if (targetEmp) markCheckedInLocal(targetEmp, today, targetStudent.name);
+
+            if (getNetworkStatus()) {
+                showToast(`✅ Checked in: ${targetStudent.name}`);
+                const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
+                setLastScannedResult(res);
+                setScannedModalData({ ...res });
+
+                const docRef = doc(db, "attendance", docId);
+                setDoc(docRef, { ...recordData, scannedAt: serverTimestamp() }).catch(async (err) => {
+                    console.warn('[Admin] Firestore write failed. Queueing to IndexedDB offline storage:', err);
+                    await queuePendingAttendance(docId, recordData);
+                    showToast(`✅ Checked in (Saved Offline): ${targetStudent.name}`);
+                });
+            } else {
+                await queuePendingAttendance(docId, recordData);
+                showToast(`✅ Checked in (Saved Offline — Will Sync When Online): ${targetStudent.name}`);
+                const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
+                setLastScannedResult(res);
+                setScannedModalData({ ...res });
+            }
 
         } catch (e) {
             console.error("[ULTRA-FAST SCANNER ERROR]", e);
@@ -560,14 +652,75 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                         </div>
                     </div>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        {/* Sync Status Badge */}
+                        <div
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '5px 12px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                backgroundColor: syncState.isSyncing
+                                    ? 'rgba(211, 162, 0, 0.2)'
+                                    : !syncState.isOnline
+                                    ? 'rgba(255, 140, 0, 0.2)'
+                                    : 'rgba(0, 255, 128, 0.15)',
+                                color: syncState.isSyncing
+                                    ? '#d3a200'
+                                    : !syncState.isOnline
+                                    ? '#ff8c00'
+                                    : '#00ff80',
+                                border: `1px solid ${
+                                    syncState.isSyncing
+                                        ? '#d3a200'
+                                        : !syncState.isOnline
+                                        ? '#ff8c00'
+                                        : '#00ff80'
+                                }`
+                            }}
+                            title={
+                                syncState.isSyncing
+                                    ? 'Syncing offline records to server...'
+                                    : !syncState.isOnline
+                                    ? 'Offline mode active. Check-ins are saved locally and will auto-sync when online.'
+                                    : 'Connected & Synced'
+                            }
+                        >
+                            {syncState.isSyncing ? (
+                                <>
+                                    <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Syncing ({syncState.pendingCount})
+                                </>
+                            ) : !syncState.isOnline ? (
+                                <>
+                                    <WifiOff size={12} /> Offline {syncState.pendingCount > 0 ? `(${syncState.pendingCount} Pending)` : '(Saved Locally)'}
+                                </>
+                            ) : (
+                                <>
+                                    <Wifi size={12} /> {syncState.pendingCount > 0 ? `Syncing ${syncState.pendingCount}...` : 'Online (Synced)'}
+                                </>
+                            )}
+                        </div>
+
+                        {/* Refresh Student List Cache Button */}
+                        <button
+                            onClick={handleManualRefreshStudents}
+                            className="header-action-btn"
+                            title="Refresh student list cache from database"
+                            disabled={isRefreshingList}
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                            <RefreshCw size={13} style={{ animation: isRefreshingList ? 'spin 1s linear infinite' : 'none' }} />
+                            <span className="hide-mobile">Refresh Cache</span>
+                        </button>
+
                         {superAdmin && (
                             <>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button onClick={exportCSV} className="header-action-btn" title="Export Data">
-                                        <Database size={16} /> <span className="hide-mobile">Export</span>
-                                    </button>
-                                </div>
+                                <button onClick={exportCSV} className="header-action-btn" title="Export Data">
+                                    <Database size={16} /> <span className="hide-mobile">Export</span>
+                                </button>
                                 <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--glass-border)' }} className="hide-mobile"></div>
                             </>
                         )}
@@ -587,6 +740,8 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             lastScannedResult={lastScannedResult} 
                             onOpenModal={(res) => setScannedModalData(res)} 
                             isGreenFlash={isGreenFlash}
+                            syncState={syncState}
+                            hasStudentsCached={students.length > 0}
                         />
                     )}
                     {activeTab === 'data' && (

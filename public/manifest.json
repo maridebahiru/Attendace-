@@ -1,0 +1,25 @@
+{
+  "name": "ኢጃት ድሬ — Attendance & Scanner System",
+  "short_name": "EJAT Attendance",
+  "description": "EJAT Dire Dawa Attendance & Scanner PWA App",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f0508",
+  "theme_color": "#65081b",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "utilities"]
+}

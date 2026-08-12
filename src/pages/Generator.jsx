@@ -138,7 +138,7 @@ const Generator = () => {
                     <img src={logo} alt="Logo" style={{ height: '80px', objectFit: 'contain' }} />
                 </div>
                 <h1 style={{ color: '#d3a200', fontSize: '1.4rem', marginBottom: '8px', fontWeight: '800' }}>
-                    የኢትዮጵያዊው ጃንደረባ ትውልድ ድሬዳዋ ቅርንጫፍ
+                    ኢጃት ድሬ
                 </h1>
                 <p style={{ color: '#f5e6c8', opacity: 0.8, fontSize: '0.9rem' }}>
                     Manual Student Registration (Admin Fallback)

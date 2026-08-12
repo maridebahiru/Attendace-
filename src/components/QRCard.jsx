@@ -61,27 +61,19 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     />
                 </div>
 
-                {/* Organization Name */}
-                <h3 style={{
-                    color: '#d3a200',
-                    fontSize: '14px',
-                    marginBottom: '2px',
-                    fontWeight: '700',
-                    textAlign: 'center'
-                }}>የኢትዮጵያዊው ጃንደረባ ትውልድ ድሬዳዋ ቅርንጫፍ</h3>
-
-                {/* Amharic Title */}
+                {/* Title */}
                 <h1 style={{
                     color: '#d3a200',
-                    fontSize: '16px',
+                    fontSize: '22px',
                     textAlign: 'center',
                     fontWeight: '900',
-                    lineHeight: '1.25',
-                    marginTop: '2px',
-                    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                    lineHeight: '1.2',
+                    marginTop: '4px',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
                     width: '100%',
-                    padding: '0 10px'
-                }}>4ኛ ትውልድ ሱባዔ ጉባኤ</h1>
+                    padding: '0 10px',
+                    letterSpacing: '0.5px'
+                }}>ኢጃት ድሬ</h1>
 
                 {/* QR Code Container */}
                 <div style={{

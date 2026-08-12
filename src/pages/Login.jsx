@@ -73,7 +73,7 @@ const Login = () => {
                     marginBottom: '8px',
                     lineHeight: '1.3'
                 }}>
-                    የኢትዮጵያዊው ጃንደረባ ትውልድ ድሬዳዋ ቅርንጫፍ
+                    ኢጃት ድሬ
                 </h2>
                 <p style={{ color: '#f5e6c8', opacity: 0.8, fontSize: '0.9rem', marginBottom: '30px' }}>
                     Student Attendance Portal Login

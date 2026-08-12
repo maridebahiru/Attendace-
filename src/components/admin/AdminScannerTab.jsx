@@ -1,7 +1,7 @@
 import React from 'react';
 import { QrCode, Camera, Shield, AlertCircle, CameraOff, CheckCircle2, User, Building, Briefcase, Mail, Phone, IdCard } from 'lucide-react';
 
-const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult, onOpenModal }) => (
+const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult, onOpenModal, isGreenFlash }) => (
     <div className="animate-fade-in" style={{ maxWidth: '750px', margin: '0 auto' }}>
         <div className="glass-effect" style={{ padding: window.innerWidth <= 768 ? '20px' : '36px', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
             <div style={{
@@ -20,12 +20,15 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
             <div
                 style={{
                     width: '100%', borderRadius: '20px', overflow: 'hidden', backgroundColor: '#000',
-                    aspectRatio: '1/1', border: isScannerActive ? '2px solid var(--accent-gold)' : '2px solid var(--glass-border)',
-                    boxShadow: isScannerActive ? '0 0 30px rgba(211, 162, 0, 0.2)' : 'var(--shadow-lg)',
-                    position: 'relative', transition: 'var(--transition-smooth)'
+                    aspectRatio: '1/1', 
+                    border: isGreenFlash ? '3px solid #00ff80' : isScannerActive ? '2px solid var(--accent-gold)' : '2px solid var(--glass-border)',
+                    boxShadow: isGreenFlash ? '0 0 40px rgba(0, 255, 128, 0.7)' : isScannerActive ? '0 0 30px rgba(211, 162, 0, 0.2)' : 'var(--shadow-lg)',
+                    position: 'relative', transition: 'all 0.15s ease'
                 }}
             >
                 <div id="reader" style={{ width: '100%', height: '100%' }}></div>
+
+                {isScannerActive && <div className="scanner-laser-line" />}
 
                 {!isScannerActive && (
                     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 5, 8, 0.8)', backdropFilter: 'blur(8px)' }}>
@@ -36,8 +39,8 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
 
                 {isScannerActive && (
                     <div style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: 'rgba(0,0,0,0.6)', padding: '5px 12px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10 }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00ff00', boxShadow: '0 0 10px #00ff00' }}></div>
-                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff' }}>LIVE SCANNER ACTIVE</span>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isGreenFlash ? '#00ff80' : '#00ff00', boxShadow: '0 0 10px #00ff00' }}></div>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff' }}>{isGreenFlash ? '⚡ READ SUCCESS' : 'ULTRA-FAST SCANNER ACTIVE'}</span>
                     </div>
                 )}
             </div>

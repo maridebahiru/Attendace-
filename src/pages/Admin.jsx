@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import {
     collection, onSnapshot, doc, getDoc, setDoc,
@@ -55,6 +55,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [students, setStudents] = useState([]);
     const [attendance, setAttendance] = useState([]);
     const [isScannerActive, setIsScannerActive] = useState(false);
+    const [isGreenFlash, setIsGreenFlash] = useState(false);
     const [scanner, setScanner] = useState(null);
     const superAdmin = isSuperAdmin();
     const [activeTab, setActiveTab] = useState(superAdmin ? 'overview' : 'scanner');
@@ -63,6 +64,44 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [scannedModalData, setScannedModalData] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const scanLockRef = useRef(false);
+    const lastScanRef = useRef({ token: '', time: 0 });
+
+    const playAudioBeep = (type = 'success') => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === 'success') {
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.12);
+            } else if (type === 'warning') {
+                osc.frequency.setValueAtTime(440, ctx.currentTime);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.25);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, ctx.currentTime);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+            }
+        } catch (e) {
+            console.warn('Audio feedback audio context error:', e);
+        }
+    };
 
     const getAdminIdentity = () => {
         const stored = sessionStorage.getItem('adminUser');
@@ -78,12 +117,12 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     useEffect(() => {
         const qStudents = collection(db, "students");
         const unsubStudents = onSnapshot(qStudents, (snap) => {
-            setStudents(snap.docs.map(doc => doc.data()));
+            setStudents(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
         });
 
         const qAttendance = collection(db, "attendance");
         const unsubAttendance = onSnapshot(qAttendance, (snap) => {
-            setAttendance(snap.docs.map(doc => doc.data()));
+            setAttendance(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
         });
 
         const handleResize = () => {
@@ -110,7 +149,20 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         try {
             await html5QrCode.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
+                {
+                    fps: 30, // Upgraded to 30 FPS for instant frame capture
+                    qrbox: { width: 260, height: 260 },
+                    aspectRatio: 1.0,
+                    videoConstraints: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 30 }
+                    },
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    }
+                },
                 onScanSuccess
             );
         } catch (err) {
@@ -128,45 +180,46 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
     };
 
     const onScanSuccess = async (decodedText) => {
+        const now = Date.now();
+        const textStr = cleanScannedToken(decodedText);
+        if (!textStr) return;
+
+        // Prevent duplicate processing of the same QR code within 1.2 seconds or concurrent processing
+        if (scanLockRef.current) return;
+        if (lastScanRef.current.token === textStr && (now - lastScanRef.current.time) < 1200) {
+            return;
+        }
+
+        scanLockRef.current = true;
+        lastScanRef.current = { token: textStr, time: now };
+
         try {
-            console.log('[SCANNER DEBUG 1] Scan Success - Raw input:', decodedText);
-            const textStr = cleanScannedToken(decodedText);
-            console.log('[SCANNER DEBUG 1] Scan Success - Cleaned input:', textStr);
+            console.log('[ULTRA-FAST SCANNER] Processing scan token:', textStr);
+            const lowerStr = textStr.toLowerCase();
 
-            if (!textStr) {
-                console.warn('[SCANNER DEBUG 1] Cleaned scan input is empty.');
-                return;
-            }
+            // STEP 1: INSTANT IN-MEMORY LOOKUP (0ms network delay)
+            let targetStudent = students.find(s => {
+                const phone = String(s.phone || '').trim().toLowerCase();
+                const empId = String(s.employeeId || s.idNo || '').trim().toLowerCase();
+                const qrTok = String(s.qrToken || '').trim().toLowerCase();
+                const docId = String(s.docId || s.id || '').trim().toLowerCase();
+                return phone === lowerStr || empId === lowerStr || qrTok === lowerStr || docId === lowerStr;
+            });
 
-            console.log('[SCANNER DEBUG 2] Lookup Start - Searching for cleaned token:', textStr);
-
-            let targetStudent = null;
-
-            // 1. Check direct identifier lookup (Employee ID e.g. EJAT-0001, Phone number, or Doc ID)
-            try {
-                targetStudent = await getStudentByIdentifier(textStr);
-            } catch (err) {
-                console.error('[SCANNER DEBUG 2.5] getStudentByIdentifier error:', err);
-            }
-
-            // 2. Check QR Token (e.g. QR_xxxx)
-            if (!targetStudent) {
-                try {
-                    targetStudent = await getStudentByQrToken(textStr);
-                } catch (err) {
-                    console.error('[SCANNER DEBUG 2.5] getStudentByQrToken error:', err);
-                }
-            }
-
-            // 3. Check JSON payload string
+            // STEP 2: JSON payload string parsing (In-Memory)
             if (!targetStudent && textStr.includes('{') && textStr.includes('}')) {
                 try {
                     const jsonStart = textStr.indexOf('{');
                     const jsonEnd = textStr.lastIndexOf('}');
                     const data = JSON.parse(textStr.substring(jsonStart, jsonEnd + 1));
-                    const identifier = cleanScannedToken(data.phone || data.idNo || data.employeeId || data.t || data.qrToken);
+                    const identifier = cleanScannedToken(data.phone || data.idNo || data.employeeId || data.t || data.qrToken).toLowerCase();
                     if (identifier) {
-                        targetStudent = await getStudentByIdentifier(identifier);
+                        targetStudent = students.find(s => {
+                            const phone = String(s.phone || '').trim().toLowerCase();
+                            const empId = String(s.employeeId || s.idNo || '').trim().toLowerCase();
+                            const qrTok = String(s.qrToken || '').trim().toLowerCase();
+                            return phone === identifier || empId === identifier || qrTok === identifier;
+                        });
                     }
                     if (!targetStudent && (data.name || data.phone)) {
                         targetStudent = {
@@ -176,44 +229,73 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             department: data.department || 'General'
                         };
                     }
-                } catch (e) {
-                    console.warn('[SCANNER DEBUG 2] JSON payload parsing fallback warning:', e);
-                }
+                } catch (e) {}
             }
 
-            console.log('[SCANNER DEBUG 3] Lookup Result - Target student found:', targetStudent);
+            // STEP 3: Fallback remote network query if not found in local state
+            if (!targetStudent) {
+                try {
+                    targetStudent = await getStudentByIdentifier(textStr);
+                } catch (err) {}
+            }
+            if (!targetStudent) {
+                try {
+                    targetStudent = await getStudentByQrToken(textStr);
+                } catch (err) {}
+            }
 
+            // Unrecognized token handling
             if (!targetStudent || !targetStudent.phone) {
-                console.log('[SCANNER DEBUG 4] Popup Trigger (Failed Lookup) - Showing error popup modal for token:', textStr);
+                playAudioBeep('error');
                 showToast("Unrecognized QR Code token", "error");
-                const errRes = {
+                setScannedModalData({
                     status: 'error',
                     errorMsg: `Unrecognized QR Code token "${textStr}". No student record found in database.`,
                     token: textStr,
                     scannedAt: new Date()
-                };
-                setScannedModalData(errRes);
+                });
                 return;
             }
 
+            // STEP 4: INSTANT IN-MEMORY ATTENDANCE CHECK (0ms network delay)
             const today = new Date().toISOString().split('T')[0];
-            const docId = `${targetStudent.phone}_${today}`;
-            const docRef = doc(db, "attendance", docId);
-            const docSnap = await getDoc(docRef);
+            const targetPhone = String(targetStudent.phone || '').trim();
+            const targetEmp = String(targetStudent.employeeId || targetStudent.idNo || '').trim();
 
-            const adminIdentity = getAdminIdentity();
-            const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+            const isAlreadyCheckedIn = attendance.some(a => {
+                if (a.date !== today) return false;
+                const aPhone = String(a.phone || '').trim();
+                const aEmp = String(a.employeeId || a.idNo || '').trim();
+                return (targetPhone && aPhone === targetPhone) || (targetEmp && aEmp === targetEmp);
+            });
 
-            if (docSnap.exists()) {
+            // Trigger instant green visual indicator flash
+            setIsGreenFlash(true);
+            setTimeout(() => setIsGreenFlash(false), 350);
+
+            if (isAlreadyCheckedIn) {
+                playAudioBeep('warning');
                 showToast(`Already checked in: ${targetStudent.name}`, "warning");
                 const res = { student: targetStudent, status: 'already_checked_in', scannedAt: new Date() };
-                console.log('[SCANNER DEBUG 4] Popup Trigger (Already Checked In) - Triggering modal visibility:', res);
                 setLastScannedResult(res);
                 setScannedModalData({ ...res });
                 return;
             }
 
-            await setDoc(docRef, {
+            // STEP 5: INSTANT OPTIMISTIC UI RESPONSE & BACKGROUND FIRESTORE WRITE
+            playAudioBeep('success');
+            showToast(`✅ Checked in: ${targetStudent.name}`);
+            const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
+            setLastScannedResult(res);
+            setScannedModalData({ ...res });
+
+            // Asynchronous Firestore check-in write in background
+            const docId = `${targetStudent.phone}_${today}`;
+            const docRef = doc(db, "attendance", docId);
+            const adminIdentity = getAdminIdentity();
+            const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+
+            setDoc(docRef, {
                 studentName: targetStudent.name,
                 phone: targetStudent.phone,
                 employeeId: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
@@ -223,24 +305,22 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 scannedAt: serverTimestamp(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr
-            });
+            }).catch(err => console.error('Background attendance write error:', err));
 
-            showToast(`✅ Checked in: ${targetStudent.name}`);
-            const res = { student: targetStudent, status: 'success', scannedAt: new Date() };
-            console.log('[SCANNER DEBUG 4] Popup Trigger (Success) - Triggering modal visibility:', res);
-            setLastScannedResult(res);
-            setScannedModalData({ ...res });
         } catch (e) {
-            console.error("[SCANNER DEBUG ERROR] Scan processing error:", e);
+            console.error("[ULTRA-FAST SCANNER ERROR]", e);
+            playAudioBeep('error');
             showToast("Scan processing error", "error");
-            const errRes = {
+            setScannedModalData({
                 status: 'error',
                 errorMsg: e.message || "An unexpected error occurred during scan lookup.",
                 token: decodedText,
                 scannedAt: new Date()
-            };
-            console.log('[SCANNER DEBUG 4] Popup Trigger (Exception Error) - Triggering error popup modal');
-            setScannedModalData(errRes);
+            });
+        } finally {
+            setTimeout(() => {
+                scanLockRef.current = false;
+            }, 600);
         }
     };
 
@@ -506,6 +586,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             stopScanner={stopScanner} 
                             lastScannedResult={lastScannedResult} 
                             onOpenModal={(res) => setScannedModalData(res)} 
+                            isGreenFlash={isGreenFlash}
                         />
                     )}
                     {activeTab === 'data' && (

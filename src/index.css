@@ -45,6 +45,26 @@ h1, h2, h3, h4, .amharic {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes scanLaser {
+  0% { top: 5%; opacity: 0.6; }
+  50% { top: 90%; opacity: 1; }
+  100% { top: 5%; opacity: 0.6; }
+}
+
+.scanner-laser-line {
+  position: absolute;
+  left: 5%;
+  width: 90%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #00ff80, #ffffff, #00ff80, transparent);
+  box-shadow: 0 0 15px #00ff80, 0 0 25px #00ff80;
+  animation: scanLaser 1.8s infinite ease-in-out;
+  z-index: 8;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+
 .header-action-btn {
     padding: 8px 16px;
     border-radius: 10px;

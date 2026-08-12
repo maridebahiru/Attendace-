@@ -128,11 +128,7 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     <div style={{ flex: 1 }}>
                         <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase' }}>Full Name</label>
                         <div style={{ color: '#65081b', fontSize: '17px', fontWeight: '700' }}>{name}</div>
-                        {cleanChristianName(studentData.christianName || studentData.christian_name) && (
-                            <div style={{ color: '#65081b', fontSize: '12px', fontWeight: '600', opacity: 0.9 }}>
-                                የክርስትና ስም: {cleanChristianName(studentData.christianName || studentData.christian_name)}
-                            </div>
-                        )}
+
                         {(employeeId || idNo) && (
                             <div style={{ color: '#d3a200', backgroundColor: '#65081b', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', marginTop: '3px' }}>
                                 ID: {employeeId || idNo}

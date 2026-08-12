@@ -140,11 +140,7 @@ const Dashboard = () => {
 
                                 <div>
                                     <h2 style={{ color: '#d3a200', margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{student.name}</h2>
-                                    {cleanChristianName(student.christianName || student.christian_name) && (
-                                        <div style={{ color: '#d3a200', fontSize: '14px', fontWeight: '700', marginTop: '2px' }}>
-                                            የክርስትና ስም: {cleanChristianName(student.christianName || student.christian_name)}
-                                        </div>
-                                    )}
+
                                     {(student.employeeId || student.idNo) && (
                                         <div style={{ color: '#f5e6c8', opacity: 0.8, fontSize: '13px', marginTop: '4px' }}>
                                             ID: <strong>{student.employeeId || student.idNo}</strong>

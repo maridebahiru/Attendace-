@@ -312,24 +312,7 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                             >
                                 <IdCard size={15} /> Registered ID: {registeredId}
                             </div>
-                            {cleanChristianName(student.christianName || student.christian_name) && (
-                                <div
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        backgroundColor: 'rgba(211, 162, 0, 0.15)',
-                                        color: 'var(--accent-gold)',
-                                        border: '1px solid var(--accent-gold)',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        fontSize: '12px',
-                                        fontWeight: '700'
-                                    }}
-                                >
-                                    የክርስትና ስም: {cleanChristianName(student.christianName || student.christian_name)}
-                                </div>
-                            )}
+
                         </div>
 
                         <div

@@ -117,9 +117,7 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
                                 {(lastScannedResult.student.christianName || lastScannedResult.student.christian_name) && (
                                     <span>የክርስትና ስም: <strong>{lastScannedResult.student.christianName || lastScannedResult.student.christian_name}</strong></span>
                                 )}
-                                {(lastScannedResult.student.department || lastScannedResult.student.church) && (
-                                    <span><Building size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.department || lastScannedResult.student.church}</span>
-                                )}
+
                             </div>
                         </div>
                     </div>

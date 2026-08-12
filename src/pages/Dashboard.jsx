@@ -161,14 +161,7 @@ const Dashboard = () => {
                                     </div>
                                 </div>
 
-                                {student.department && (
-                                    <div>
-                                        <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Church (አጥቢያ)</div>
-                                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Building size={14} color="#d3a200" /> {student.department}
-                                        </div>
-                                    </div>
-                                )}
+
 
                                 {student.educationLevel && (
                                     <div>

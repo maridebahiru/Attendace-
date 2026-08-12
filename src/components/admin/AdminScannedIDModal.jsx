@@ -346,11 +346,7 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                                     <Phone size={13} /> Phone: {student.phone}
                                 </span>
                             )}
-                            {(student.department || student.church) && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Building size={13} /> {student.department || student.church}
-                                </span>
-                            )}
+
                             {student.position && (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <Briefcase size={13} /> {student.position}

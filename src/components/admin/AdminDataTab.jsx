@@ -175,7 +175,7 @@ const AdminDataTab = ({
                         <Search size={20} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-gold)', opacity: 0.5 }} />
                         <input
                             type="text"
-                            placeholder="Find student by name, phone, or employee ID..."
+                            placeholder="Find student by name, phone, or ID..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
@@ -194,7 +194,7 @@ const AdminDataTab = ({
                                 <th style={thStyle} onClick={() => handleSort('name')}>
                                     Student Profile
                                 </th>
-                                <th style={thStyle}>Employee / Student ID</th>
+                                <th style={thStyle}>ID</th>
                                 <th style={thStyle}>Department & Position</th>
                                 <th style={{ ...thStyle, textAlign: 'center' }} onClick={() => handleSort('totalDays')}>
                                     Total Attended

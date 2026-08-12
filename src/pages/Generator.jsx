@@ -188,10 +188,10 @@ const Generator = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '6px', color: '#d3a200', fontSize: '13px', fontWeight: '600' }}>Employee/Student ID</label>
+                        <label style={{ display: 'block', marginBottom: '6px', color: '#d3a200', fontSize: '13px', fontWeight: '600' }}>ID</label>
                         <input
                             type="text"
-                            placeholder="EMP-101"
+                            placeholder="EJAT-00"
                             value={formData.employeeId}
                             onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                             style={{

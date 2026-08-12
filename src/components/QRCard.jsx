@@ -2,6 +2,7 @@ import React, { forwardRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Phone } from 'lucide-react';
 import footerImg from '../assets/ELFAZ-01 (2).png';
+import { cleanChristianName } from '../utils/studentUtils';
 
 const QRCard = forwardRef(({ studentData, logo }, ref) => {
     const { name, phone, idNo, employeeId, department, profilePhotoUrl, qrToken } = studentData;
@@ -127,9 +128,9 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     <div style={{ flex: 1 }}>
                         <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase' }}>Full Name</label>
                         <div style={{ color: '#65081b', fontSize: '17px', fontWeight: '700' }}>{name}</div>
-                        {studentData.christianName && (
+                        {cleanChristianName(studentData.christianName || studentData.christian_name) && (
                             <div style={{ color: '#65081b', fontSize: '12px', fontWeight: '600', opacity: 0.9 }}>
-                                የክርስትና ስም: {studentData.christianName}
+                                የክርስትና ስም: {cleanChristianName(studentData.christianName || studentData.christian_name)}
                             </div>
                         )}
                         {(employeeId || idNo) && (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { QrCode, Camera, Shield, AlertCircle, CameraOff, CheckCircle2, User, Building, Briefcase, Mail, Phone, IdCard } from 'lucide-react';
+import { cleanChristianName } from '../../utils/studentUtils';
 
 const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScannedResult, onOpenModal, isGreenFlash }) => (
     <div className="animate-fade-in" style={{ maxWidth: '750px', margin: '0 auto' }}>
@@ -114,8 +115,8 @@ const AdminScannerTab = ({ isScannerActive, startScanner, stopScanner, lastScann
                                 {lastScannedResult.student.phone && (
                                     <span><Phone size={14} style={{ display: 'inline', marginRight: '4px' }} /> {lastScannedResult.student.phone}</span>
                                 )}
-                                {(lastScannedResult.student.christianName || lastScannedResult.student.christian_name) && (
-                                    <span>የክርስትና ስም: <strong>{lastScannedResult.student.christianName || lastScannedResult.student.christian_name}</strong></span>
+                                {cleanChristianName(lastScannedResult.student.christianName || lastScannedResult.student.christian_name) && (
+                                    <span>የክርስትና ስም: <strong>{cleanChristianName(lastScannedResult.student.christianName || lastScannedResult.student.christian_name)}</strong></span>
                                 )}
 
                             </div>

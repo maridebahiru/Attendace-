@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import QRCard from '../components/QRCard';
 import html2canvas from 'html2canvas';
+import { cleanChristianName } from '../utils/studentUtils';
 import logo from '../assets/logo.png';
 import { User, Phone, Mail, Building, Briefcase, Download, LogOut, CheckCircle, Calendar, Shield, IdCard } from 'lucide-react';
 
@@ -139,9 +140,9 @@ const Dashboard = () => {
 
                                 <div>
                                     <h2 style={{ color: '#d3a200', margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{student.name}</h2>
-                                    {student.christianName && (
+                                    {cleanChristianName(student.christianName || student.christian_name) && (
                                         <div style={{ color: '#d3a200', fontSize: '14px', fontWeight: '700', marginTop: '2px' }}>
-                                            የክርስትና ስም: {student.christianName}
+                                            የክርስትና ስም: {cleanChristianName(student.christianName || student.christian_name)}
                                         </div>
                                     )}
                                     {(student.employeeId || student.idNo) && (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, AlertCircle, IdCard, User, Building, Briefcase, Phone, ShieldCheck, Eye, ExternalLink, Image, Maximize2 } from 'lucide-react';
 import QRCard from '../QRCard';
+import { cleanChristianName } from '../../utils/studentUtils';
 
 const AdminScannedIDModal = ({ scanResult, onClose }) => {
     const [showUploadedId, setShowUploadedId] = useState(false);
@@ -311,7 +312,7 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                             >
                                 <IdCard size={15} /> Registered ID: {registeredId}
                             </div>
-                            {(student.christianName || student.christian_name) && (
+                            {cleanChristianName(student.christianName || student.christian_name) && (
                                 <div
                                     style={{
                                         display: 'inline-flex',
@@ -326,7 +327,7 @@ const AdminScannedIDModal = ({ scanResult, onClose }) => {
                                         fontWeight: '700'
                                     }}
                                 >
-                                    የክርስትና ስም: {student.christianName || student.christian_name}
+                                    የክርስትና ስም: {cleanChristianName(student.christianName || student.christian_name)}
                                 </div>
                             )}
                         </div>

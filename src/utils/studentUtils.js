@@ -33,6 +33,16 @@ export const cleanScannedToken = (val) => {
 };
 
 /**
+ * Sanitizes christianName to remove duplicated "የክርስትና ስም:" prefixes.
+ */
+export const cleanChristianName = (val) => {
+  if (!val) return '';
+  let str = String(val).trim();
+  str = str.replace(/^(የክርስትና\s*ስም\s*:\s*)+/gi, '').trim();
+  return str;
+};
+
+/**
  * Ensures that the student document has a permanent qrToken.
  * If qrToken is missing, generates one and updates Firestore.
  * Returns the updated student object.

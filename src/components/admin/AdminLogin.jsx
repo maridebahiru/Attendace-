@@ -6,7 +6,7 @@ import { Lock, Shield, User, Key } from 'lucide-react';
 const DEFAULT_ADMIN_EMAIL = "maramawitdereje93@gmail.com";
 
 const AdminLogin = ({ onLoginSuccess }) => {
-    const [username, setUsername] = useState(DEFAULT_ADMIN_EMAIL);
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [attempts, setAttempts] = useState(0);

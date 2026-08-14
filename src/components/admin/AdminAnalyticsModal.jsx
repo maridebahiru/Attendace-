@@ -2,13 +2,27 @@ import React from 'react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, Cell } from 'recharts';
 import { LineChart, X, Activity, User, ShieldAlert, Zap } from 'lucide-react';
 
-const AdminAnalyticsModal = ({ students, attendance, selectedStudentForAnalytics, setSelectedStudentForAnalytics }) => {
+const getFirstName = (str) => {
+    if (!str || typeof str !== 'string') return 'Attendee';
+    return str.trim().split(' ')[0] || 'Attendee';
+};
+
+const AdminAnalyticsModal = ({ students = [], attendance = [], selectedStudentForAnalytics, setSelectedStudentForAnalytics }) => {
     if (!selectedStudentForAnalytics) return null;
+
+    const studentRecords = attendance.filter(a => 
+        (selectedStudentForAnalytics.phone && a.phone === selectedStudentForAnalytics.phone) || 
+        (selectedStudentForAnalytics.employeeId && (a.employeeId === selectedStudentForAnalytics.employeeId || a.employeeId === selectedStudentForAnalytics.idNo))
+    );
+
+    const totalDays = selectedStudentForAnalytics.totalDays ?? studentRecords.length;
 
     // ================= SPECIFIC STUDENT ANALYTICS LOGIC =================
     const getStudentAnalyticsData = (student) => {
         if (!student) return [];
         const partner = student.partnerPhone ? students.find(s => s.phone === student.partnerPhone) : null;
+        const studentFirstName = getFirstName(student.name);
+        const partnerFirstName = partner ? getFirstName(partner.name) : null;
         
         // Generate a 14-day lookback for the specific student
         const last14Days = [...Array(14)].map((_, i) => {
@@ -18,33 +32,52 @@ const AdminAnalyticsModal = ({ students, attendance, selectedStudentForAnalytics
         }).reverse();
 
         return last14Days.map(date => {
-            const studentAttended = attendance.some(a => a.phone === student.phone && a.date === date) ? 1 : 0;
-            const partnerAttended = partner ? (attendance.some(a => a.phone === partner.phone && a.date === date) ? 1 : 0) : 0;
+            const studentAttended = attendance.some(a => 
+                ((student.phone && a.phone === student.phone) || (student.employeeId && a.employeeId === student.employeeId)) && a.date === date
+            ) ? 1 : 0;
+
+            const partnerAttended = partner ? (attendance.some(a => 
+                ((partner.phone && a.phone === partner.phone) || (partner.employeeId && a.employeeId === partner.employeeId)) && a.date === date
+            ) ? 1 : 0) : 0;
+
             return {
                 date: date.substring(5),
-                [student.name.split(' ')[0]]: studentAttended,
-                ...(partner ? { [partner.name.split(' ')[0]]: partnerAttended } : {})
+                [studentFirstName]: studentAttended,
+                ...(partnerFirstName ? { [partnerFirstName]: partnerAttended } : {})
             };
         });
     };
 
     const studentChartData = getStudentAnalyticsData(selectedStudentForAnalytics);
-    const partnerNameForChart = selectedStudentForAnalytics.partnerName ? selectedStudentForAnalytics.partnerName.split(' ')[0] : null;
-    const studentNameForChart = selectedStudentForAnalytics.name.split(' ')[0];
+    const partnerNameForChart = selectedStudentForAnalytics.partnerName ? getFirstName(selectedStudentForAnalytics.partnerName) : null;
+    const studentNameForChart = getFirstName(selectedStudentForAnalytics.name);
 
-    const calculateSynergy = (student) => {
-        if (!student || !student.partnerPhone) return 0;
-        const studentRecords = attendance.filter(a => a.phone === student.phone);
-        if (studentRecords.length === 0) return 0;
+    const calculateSynergyAndSolo = (student) => {
+        if (!student) return { synergy: 0, soloDays: 0 };
+        if (studentRecords.length === 0) return { synergy: 0, soloDays: 0 };
+        
         let togetherCount = 0;
+        let soloCount = 0;
+
         studentRecords.forEach(r => {
-            const partnerAttended = attendance.some(a => a.phone === student.partnerPhone && a.date === r.date);
-            if (partnerAttended) togetherCount++;
+            const partnerPhone = student.partnerPhone;
+            if (partnerPhone) {
+                const partnerAttended = attendance.some(a => a.phone === partnerPhone && a.date === r.date);
+                if (partnerAttended) {
+                    togetherCount++;
+                } else {
+                    soloCount++;
+                }
+            } else {
+                soloCount++;
+            }
         });
-        return Math.round((togetherCount / studentRecords.length) * 100);
+
+        const synergy = student.partnerPhone ? Math.round((togetherCount / studentRecords.length) * 100) : 0;
+        return { synergy, soloDays: soloCount };
     };
 
-    const synergy = calculateSynergy(selectedStudentForAnalytics);
+    const { synergy, soloDays } = calculateSynergyAndSolo(selectedStudentForAnalytics);
 
     return (
         <div 
@@ -73,12 +106,12 @@ const AdminAnalyticsModal = ({ students, attendance, selectedStudentForAnalytics
                             display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-gold)',
                             fontWeight: '800', fontSize: '20px'
                         }}>
-                            {selectedStudentForAnalytics.name.charAt(0)}
+                            {(selectedStudentForAnalytics.name || '?').charAt(0).toUpperCase()}
                         </div>
                         <div>
                             <h2 style={{ color: 'var(--accent-gold)', margin: 0, fontSize: '24px', letterSpacing: '-0.5px' }}>Attendance Profile</h2>
                             <div style={{ fontSize: '14px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                                <User size={14} /> {selectedStudentForAnalytics.name} • {selectedStudentForAnalytics.phone}
+                                <User size={14} /> {selectedStudentForAnalytics.name || 'Attendee'} • {selectedStudentForAnalytics.phone || selectedStudentForAnalytics.employeeId || 'N/A'}
                             </div>
                         </div>
                     </div>
@@ -105,13 +138,13 @@ const AdminAnalyticsModal = ({ students, attendance, selectedStudentForAnalytics
                         <div className="glass-effect" style={{ padding: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.03)', textAlign: 'center' }}>
                             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Activity size={18} color="var(--accent-gold)" opacity={0.5} /></div>
                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Commitment</div>
-                            <div style={{ fontSize: '32px', color: 'var(--accent-gold)', fontWeight: '800' }}>{selectedStudentForAnalytics.totalDays}</div>
+                            <div style={{ fontSize: '32px', color: 'var(--accent-gold)', fontWeight: '800' }}>{totalDays}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Total Presence</div>
                         </div>
                         <div className="glass-effect" style={{ padding: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.03)', textAlign: 'center' }}>
                             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><ShieldAlert size={18} color="#ff4d4d" opacity={0.5} /></div>
                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Solo Ratio</div>
-                            <div style={{ fontSize: '32px', color: '#ff4d4d', fontWeight: '800' }}>{selectedStudentForAnalytics.soloDays}</div>
+                            <div style={{ fontSize: '32px', color: '#ff4d4d', fontWeight: '800' }}>{soloDays}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Independent Check-ins</div>
                         </div>
                         <div className="glass-effect" style={{ padding: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.03)', textAlign: 'center' }}>
@@ -166,3 +199,4 @@ const AdminAnalyticsModal = ({ students, attendance, selectedStudentForAnalytics
 };
 
 export default AdminAnalyticsModal;
+

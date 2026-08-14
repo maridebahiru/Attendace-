@@ -18,22 +18,33 @@ import AdminDateAnalysisTab from '../components/admin/AdminDateAnalysisTab';
 import AdminUserManagementTab from '../components/admin/AdminUserManagementTab';
 import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
 import AdminScannedIDModal from '../components/admin/AdminScannedIDModal';
+import AdminLocationGate from '../components/admin/AdminLocationGate';
 import { TabButton } from '../components/admin/AdminShared';
 import { getStudentByQrToken, getStudentByIdentifier, cleanScannedToken } from '../utils/studentUtils';
 import { exportToCSV } from '../utils/exportUtils';
 import { checkPermission, logSuperAdminAudit, getUserRole, isSuperAdmin } from '../utils/rbac';
+import { isLocationVerifiedSession, clearLocationSession, getLocationAuditLog } from '../utils/locationService';
 
 const Admin = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
         sessionStorage.getItem('isAdminAuth') === 'true'
     );
+    const [isLocationVerified, setIsLocationVerified] = useState(
+        isLocationVerifiedSession()
+    );
     const [toast, setToast] = useState(null);
 
-    const handleLoginSuccess = () => setIsAuthenticated(true);
+    const handleLoginSuccess = () => {
+        setIsAuthenticated(true);
+        setIsLocationVerified(isLocationVerifiedSession());
+    };
 
     const handleLogout = () => {
         sessionStorage.removeItem('isAdminAuth');
+        sessionStorage.removeItem('adminUser');
+        clearLocationSession();
         setIsAuthenticated(false);
+        setIsLocationVerified(false);
     };
 
     const showToast = (msg, type = 'success') => {
@@ -43,6 +54,15 @@ const Admin = () => {
 
     if (!isAuthenticated) {
         return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
+    }
+
+    if (!isLocationVerified) {
+        return (
+            <AdminLocationGate 
+                onVerified={() => setIsLocationVerified(true)} 
+                onLogout={handleLogout} 
+            />
+        );
     }
 
     return (
@@ -372,7 +392,8 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 date: today,
                 scannedAt: new Date().toISOString(),
                 scannedBy: adminIdentity,
-                deviceInfo: deviceInfoStr
+                deviceInfo: deviceInfoStr,
+                scannedLocation: getLocationAuditLog()
             };
 
             // Mark locally in IndexedDB immediately to prevent double scanning offline or online
@@ -444,7 +465,8 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 date: dateToMark,
                 scannedAt: serverTimestamp(),
                 scannedBy: adminIdentity,
-                deviceInfo: deviceInfoStr
+                deviceInfo: deviceInfoStr,
+                scannedLocation: getLocationAuditLog()
             });
             showToast(`✅ Manually Checked in: ${student.name}`);
         } catch (e) {

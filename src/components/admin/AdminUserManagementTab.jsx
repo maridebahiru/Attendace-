@@ -15,9 +15,9 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
         const partner = s.partnerPhone ? students.find(st => st.phone === s.partnerPhone) : null;
         return { ...s, partnerName: partner ? partner.name : null };
     }).filter(s =>
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.phone.includes(searchTerm) ||
-        (s.idNo && s.idNo.toLowerCase().includes(searchTerm.toLowerCase()))
+        (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.phone || '').includes(searchTerm) ||
+        (s.idNo && String(s.idNo).toLowerCase().includes(searchTerm.toLowerCase()))
     ).sort((a, b) => {
         const getGroupSortName = (st) => {
             if (!st.partnerPhone) return st.name || '';

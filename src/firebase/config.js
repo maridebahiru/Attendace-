@@ -1,21 +1,18 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-
-// Firebase Setup:
-// 1. Enable Firestore in test mode
-// 2. Collections:
-//    - students -> doc ID = phone -> fields: name, phone, idNo, createdAt
-//    - attendance -> doc ID = phone_YYYY-MM-DD -> fields: studentName, phone, date, scannedAt
+import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyALEOBJcUQNM2Y6GK1_rSXkh6d7x7Gk-X4",
-  authDomain: "attendace-67816.firebaseapp.com",
-  projectId: "attendace-67816",
-  storageBucket: "attendace-67816.firebasestorage.app",
-  messagingSenderId: "695627313669",
-  appId: "1:695627313669:web:81260241687853db06a26c",
-  measurementId: "G-9FQJ2KC0DK"
+  apiKey: "AIzaSyCioM3O_3T72CZgbSBDICBOcIx8guZpwig",
+  authDomain: "attendace-863f6.firebaseapp.com",
+  projectId: "attendace-863f6",
+  storageBucket: "attendace-863f6.firebasestorage.app",
+  messagingSenderId: "815990575525",
+  appId: "1:815990575525:web:4347e05aae5ac4464fd84c",
+  measurementId: "G-X47FX6JM33"
 };
 
 const app = initializeApp(firebaseConfig);
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 export const db = getFirestore(app);
+

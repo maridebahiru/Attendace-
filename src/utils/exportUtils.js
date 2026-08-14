@@ -37,8 +37,12 @@ export const prepareReportRows = (filteredStudents, filteredAttendance) => {
   return filteredAttendance.map((a, index) => {
     const s = studentMap[a.phone] || {};
     let scannedAtStr = '';
-    if (a.scannedAt?.toDate) {
+    if (typeof a.scannedAt?.toDate === 'function') {
       scannedAtStr = a.scannedAt.toDate().toLocaleTimeString();
+    } else if (a.scannedAt instanceof Date) {
+      scannedAtStr = a.scannedAt.toLocaleTimeString();
+    } else if (typeof a.scannedAt === 'object' && typeof a.scannedAt?.seconds === 'number') {
+      scannedAtStr = new Date(a.scannedAt.seconds * 1000).toLocaleTimeString();
     } else if (a.scannedAt) {
       scannedAtStr = String(a.scannedAt);
     }
@@ -53,7 +57,8 @@ export const prepareReportRows = (filteredStudents, filteredAttendance) => {
       'Date': a.date || 'N/A',
       'Time': scannedAtStr || 'N/A',
       'Scanned By': a.scannedBy || 'Admin',
-      'Device Info': a.deviceInfo || 'Desktop Browser'
+      'Device Info': a.deviceInfo || 'Desktop Browser',
+      'Location Audit': a.scannedLocation?.status || 'N/A'
     };
   });
 };

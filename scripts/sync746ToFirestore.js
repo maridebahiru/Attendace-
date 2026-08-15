@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const PROJECT_ID = 'attendace-863f6';
+const PROJECT_ID = 'attendace-a7258';
 const jsonPath = path.resolve('public/students_746.json');
 
 async function fetchAllDocNames() {

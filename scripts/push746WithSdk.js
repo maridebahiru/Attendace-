@@ -4,13 +4,13 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCioM3O_3T72CZgbSBDICBOcIx8guZpwig",
-  authDomain: "attendace-863f6.firebaseapp.com",
-  projectId: "attendace-863f6",
-  storageBucket: "attendace-863f6.firebasestorage.app",
-  messagingSenderId: "815990575525",
-  appId: "1:815990575525:web:4347e05aae5ac4464fd84c",
-  measurementId: "G-X47FX6JM33"
+  apiKey: "AIzaSyDXzeSElbY-N4h_aFT-k1tLDIYVVFZ70zI",
+  authDomain: "attendace-a7258.firebaseapp.com",
+  projectId: "attendace-a7258",
+  storageBucket: "attendace-a7258.firebasestorage.app",
+  messagingSenderId: "694091372107",
+  appId: "1:694091372107:web:2b27eb290e951ff343dfce",
+  measurementId: "G-T223QDE7S3"
 };
 
 const app = initializeApp(firebaseConfig);

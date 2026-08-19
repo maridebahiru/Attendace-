@@ -56,21 +56,22 @@ const Admin = () => {
         return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
     }
 
-    if (!isLocationVerified) {
-        return (
-            <AdminLocationGate 
-                onVerified={() => setIsLocationVerified(true)} 
-                onLogout={handleLogout} 
-            />
-        );
-    }
-
     return (
-        <DashboardContent
-            onLogout={handleLogout}
-            showToast={showToast}
-            toast={toast}
-        />
+        <>
+            <DashboardContent
+                onLogout={handleLogout}
+                showToast={showToast}
+                toast={toast}
+            />
+            {!isLocationVerified && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+                    <AdminLocationGate 
+                        onVerified={() => setIsLocationVerified(true)} 
+                        onLogout={handleLogout} 
+                    />
+                </div>
+            )}
+        </>
     );
 };
 
@@ -106,6 +107,23 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         return () => unsubscribe();
     }, []);
 
+    // One-time student fetch function reusable by manual refresh & mutations
+    const fetchStudents = async () => {
+        try {
+            const q = collection(db, "students");
+            const snap = await getDocs(q);
+            const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+            setStudents(list);
+            await saveStudentsLocal(list);
+            return list;
+        } catch (err) {
+            console.warn('[Admin] Firestore fetch students error/fallback:', err);
+            const cached = await getStudentsLocal();
+            if (cached && cached.length > 0) setStudents(cached);
+            return cached || [];
+        }
+    };
+
     const handleManualRefreshStudents = async () => {
         setIsRefreshingList(true);
         if (!getNetworkStatus()) {
@@ -114,11 +132,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             return;
         }
         try {
-            const q = collection(db, "students");
-            const snap = await getDocs(q);
-            const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-            setStudents(list);
-            await saveStudentsLocal(list);
+            const list = await fetchStudents();
             await syncPendingAttendance(db);
             showToast(`✅ Refreshed & cached ${list.length} student records locally`);
         } catch (e) {
@@ -183,19 +197,19 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
             }
         });
 
-        const qStudents = collection(db, "students");
-        const unsubStudents = onSnapshot(qStudents, (snap) => {
-            const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-            setStudents(list);
-            saveStudentsLocal(list);
-        }, (err) => {
-            console.warn('[Admin] Firestore student listener offline fallback:', err);
-            getStudentsLocal().then(cached => {
-                if (cached && cached.length > 0) setStudents(cached);
-            });
-        });
+        // Perform one-time fetch for student roster instead of live onSnapshot listener
+        fetchStudents();
 
-        const qAttendance = collection(db, "attendance");
+        // Bounded attendance listener: filter to recent 30-day range to prevent unbounded collection reads
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+        const qAttendance = query(
+            collection(db, "attendance"),
+            where("date", ">=", thirtyDaysAgoStr)
+        );
+
         const unsubAttendance = onSnapshot(qAttendance, (snap) => {
             setAttendance(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
         }, (err) => {
@@ -223,7 +237,6 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
         window.addEventListener('resize', handleResize);
         return () => {
-            unsubStudents();
             unsubAttendance();
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('resize', handleResize);
@@ -495,6 +508,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 ...studentData,
                 createdAt: serverTimestamp()
             });
+            await fetchStudents();
             showToast("Student added successfully");
             return true;
         } catch (e) {
@@ -511,6 +525,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         }
         try {
             await setDoc(doc(db, "students", phone), updatedData, { merge: true });
+            await fetchStudents();
             showToast("Student updated successfully");
             return true;
         } catch (e) {
@@ -528,6 +543,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         if (!window.confirm("Are you sure you want to delete this student? Attendance records will remain.")) return;
         try {
             await deleteDoc(doc(db, "students", phone));
+            await fetchStudents();
             showToast("Student deleted successfully");
             return true;
         } catch (e) {

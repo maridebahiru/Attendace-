@@ -72,7 +72,7 @@ export const getStudentByIdentifier = async (identifier) => {
   if (!identifier) return null;
   const term = String(identifier).trim();
 
-  // 1. Check direct doc lookup by doc ID (e.g. EJAT-0001)
+  // 1. Direct doc lookup by doc ID (most common: phone or student ID as doc ID)
   try {
     const phoneRef = doc(db, 'students', term);
     const phoneSnap = await getDoc(phoneRef);
@@ -81,36 +81,43 @@ export const getStudentByIdentifier = async (identifier) => {
       return { docId: phoneSnap.id, ...data, phone: data.phone || data.employeeId || phoneSnap.id };
     }
   } catch (e) {
-    console.log('Direct doc lookup skipped');
+    // Direct doc lookup skipped
   }
 
-  // 2. Query by phone field
   const studentsCol = collection(db, 'students');
-  const phoneQuery = query(studentsCol, where('phone', '==', term));
-  const phoneDocs = await getDocs(phoneQuery);
-  if (!phoneDocs.empty) {
-    const docSnap = phoneDocs.docs[0];
-    const data = docSnap.data();
-    return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
-  }
 
-  // 3. Query by employeeId field
-  const empQuery = query(studentsCol, where('employeeId', '==', term));
-  const empDocs = await getDocs(empQuery);
-  if (!empDocs.empty) {
-    const docSnap = empDocs.docs[0];
-    const data = docSnap.data();
-    return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
-  }
+  // 2. Query by employeeId field (primary student identifier)
+  try {
+    const empQuery = query(studentsCol, where('employeeId', '==', term));
+    const empDocs = await getDocs(empQuery);
+    if (!empDocs.empty) {
+      const docSnap = empDocs.docs[0];
+      const data = docSnap.data();
+      return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
+    }
+  } catch (e) {}
+
+  // 3. Query by phone field
+  try {
+    const phoneQuery = query(studentsCol, where('phone', '==', term));
+    const phoneDocs = await getDocs(phoneQuery);
+    if (!phoneDocs.empty) {
+      const docSnap = phoneDocs.docs[0];
+      const data = docSnap.data();
+      return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
+    }
+  } catch (e) {}
 
   // 4. Query by idNo field (fallback)
-  const idNoQuery = query(studentsCol, where('idNo', '==', term));
-  const idNoDocs = await getDocs(idNoQuery);
-  if (!idNoDocs.empty) {
-    const docSnap = idNoDocs.docs[0];
-    const data = docSnap.data();
-    return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
-  }
+  try {
+    const idNoQuery = query(studentsCol, where('idNo', '==', term));
+    const idNoDocs = await getDocs(idNoQuery);
+    if (!idNoDocs.empty) {
+      const docSnap = idNoDocs.docs[0];
+      const data = docSnap.data();
+      return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
+    }
+  } catch (e) {}
 
   return null;
 };
